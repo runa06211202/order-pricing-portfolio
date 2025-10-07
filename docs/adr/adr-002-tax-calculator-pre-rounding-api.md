@@ -86,5 +86,5 @@ public interface TaxCalculator {
   - orderService_delegatesToAddTax_withGivenMode_defaultHalfUp()
 - 移行
   - 既存実装に calcTaxAmount を追加するだけで破壊的変更なし。
--失敗モード
+- 失敗モード
   - 引数不正（net<0、region blank）は IAE 等、TaxCalculator の契約内で統一。
