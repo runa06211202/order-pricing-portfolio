@@ -2,7 +2,9 @@ package com.example.order.app;
 
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderResult;
-import com.example.order.port.*;
+import com.example.order.port.InventoryService;
+import com.example.order.port.ProductRepository;
+import com.example.order.port.TaxCalculator;
 
 public class OrderService {
   private final ProductRepository products;
@@ -15,7 +17,11 @@ public class OrderService {
     this.tax = tax;
   }
 
-  public OrderResult place(OrderRequest req) {
+  public OrderResult placeOrder(OrderRequest req) {
+	  // 引数チェック
+	  if(req == null || req.lines() == null || req.lines().isEmpty()) {
+		  throw new IllegalArgumentException("lines must not be null or empty");
+	  }
     throw new UnsupportedOperationException("not implemented yet");
   }
 }
