@@ -2,6 +2,7 @@ package com.example.order.app;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.math.RoundingMode;
 import java.util.List;
@@ -46,7 +47,7 @@ class OrderServiceTest {
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
     	//When: sut.placeOrder(req) Then: IAE
     	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
-    	
+    	verifyNoInteractions(products, inventory, tax);
     }
     @Test
     @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
@@ -57,6 +58,7 @@ class OrderServiceTest {
     	assertThatThrownBy(() -> sut.placeOrder(req))
     		.isInstanceOf(IllegalArgumentException.class)
     		.hasMessageContainingAll("lines");
+    	verifyNoInteractions(products, inventory, tax);
     }
     @Test
     @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
@@ -66,8 +68,9 @@ class OrderServiceTest {
     	// Given: qty <= 0
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
     	assertThatThrownBy(() -> sut.placeOrder(req))
-		.isInstanceOf(IllegalArgumentException.class)
-		.hasMessageContainingAll("qty");
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContainingAll("qty");
+    	verifyNoInteractions(products, inventory, tax);
     }
     @Test @Disabled("skeleton")
     void throwsWhenRegionBlank() {}
