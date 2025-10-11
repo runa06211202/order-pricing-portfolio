@@ -2,6 +2,7 @@ package com.example.order.app;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.example.order.domain.Product;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
+import com.example.order.dto.OrderResult;
 import com.example.order.port.InventoryService;
 import com.example.order.port.ProductRepository;
 import com.example.order.port.TaxCalculator;
@@ -32,7 +34,9 @@ import com.example.order.port.TaxCalculator;
 @ExtendWith(MockitoExtension.class)
 /**
  * 関連ADR:
+ *  - ADR-001 金額スケール正規化
  *  - ADR-003 Repository の findById は null を返さない（“存在しない”は Optional.empty）
+ *  - ADR-004 DiscountType enum化
  */
 class OrderServiceTest {
 
@@ -114,7 +118,8 @@ class OrderServiceTest {
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 5), new Line("B", 5)));
     	when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
     	when(products.findById("B")).thenReturn(Optional.empty()); // これで「Bが存在しない」ケース
-    	
+
+    	//When: findById("B") Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
         	.isInstanceOf(IllegalArgumentException.class)
         	.hasMessageContaining("product not found: B");
@@ -123,6 +128,29 @@ class OrderServiceTest {
   }
 
   @Nested class Normal {
+	@Test
+	@DisplayName("N-1-1: 割引適用無し")
+	void checkNoDiscount() {
+		// Given: Line("A", 5)("B", 5)
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 5), new Line("B", 5)));
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+		
+		// モック呼出(税計算)呼出だけ確認するため任意値
+		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
+		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+		
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 1500.00, totalDiscount = 0.00
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("1500.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("0.00");
+		
+		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+
+	}
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }
