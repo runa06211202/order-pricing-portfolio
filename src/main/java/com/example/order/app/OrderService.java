@@ -23,6 +23,8 @@ public class OrderService {
   private static final String LINES = "lines";
   private static final String QTY = "qty";
   private static final String REGION = "region";
+  private static final BigDecimal VOLUME_DISCOUNT_RATE = new BigDecimal("0.05");
+  
   
 
   public OrderService(ProductRepository products, InventoryService inventory, TaxCalculator tax) {
@@ -46,6 +48,8 @@ public class OrderService {
 	  }
 	  
 	  BigDecimal subtotalBase = BigDecimal.ZERO;
+	  BigDecimal volumeDiscount = BigDecimal.ZERO;
+	  List<DiscountType> appliedDiscounts = new ArrayList<DiscountType>();
 	  for(Line line : req.lines()) {
 		  // Optional<Product>をここでunwrap
 		  Product product = products.findById(line.productId())
@@ -56,21 +60,33 @@ public class OrderService {
 				  .setScale(2, RoundingMode.HALF_UP);
 
 		  subtotalBase = subtotalBase.add(lineSubtotal);
+		  
+		  // VOLUME割引
+		  if(line.qty() >= 10) {
+			  volumeDiscount = volumeDiscount.add(lineSubtotal
+					  .multiply(VOLUME_DISCOUNT_RATE))
+					  .setScale(2);
+		  }		  
 	  }
+
+	  if(volumeDiscount.compareTo(BigDecimal.ZERO) == 1) {
+		  appliedDiscounts.add(DiscountType.VOLUME);
+	  }
+	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).abs().setScale(2);
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal totalDiscount = BigDecimal.ZERO;
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
-	  List<DiscountType> appliedDiscounts = new ArrayList<DiscountType>();
 
 	  totalNetBeforeDiscount = subtotalBase;
+	  totalDiscount = totalDiscount.add(volumeDiscount);
 	  
 	  //税計算(仮)
 	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
 	  totalGross = tax.addTax(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
 	  
-	  OrderResult orderResult = new OrderResult(totalNetBeforeDiscount, totalDiscount, totalTax, totalGross, appliedDiscounts);
+	  OrderResult orderResult = new OrderResult(subtotalBase, totalDiscount, totalTax, totalGross, appliedDiscounts);
 
 	  return orderResult;
   }
