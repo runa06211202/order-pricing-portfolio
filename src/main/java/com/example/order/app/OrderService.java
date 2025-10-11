@@ -37,6 +37,9 @@ public class OrderService {
 	  if(req.region() == null || req.region().isBlank()) {
 		  throw new IllegalArgumentException(REGION + "must not be null or blank strings");
 	  }
+	  for(Line line : req.lines()) {
+		  products.findById(line.productId()).orElseThrow(() -> new IllegalArgumentException( "product not found: " + line.productId()));
+	  }
     throw new UnsupportedOperationException("not implemented yet");
   }
 }
