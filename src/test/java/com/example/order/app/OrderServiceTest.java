@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -68,14 +70,35 @@ class OrderServiceTest {
     void throwsWhenQtyNonPositive(int qty) {
     	// Given: qty <= 0
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
+    	//When: sut.placeOrder(req) Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContainingAll("qty");
     	verifyNoInteractions(products, inventory, tax);
     }
 
-    @Test @Disabled("skeleton")
-    void throwsWhenRegionBlank() {}
+    static Stream<String> blankStrings() {
+        return Stream.of(
+            null,
+            "",
+            " ",
+            "   ",
+            "\t",
+            "\n"
+        );
+    }
+    @ParameterizedTest
+    @MethodSource("blankStrings")
+    @DisplayName("G-3-1: regionが nullまたは空または空文字の時 IAEがThrowされる")
+    void throwsWhenRegionBlank(String region) {
+    	// Given: region = null or "" or " "etc.blank strings
+    	OrderRequest req = new OrderRequest(region, RoundingMode.HALF_UP, List.of(new Line("P01", 5)));
+    	//When: sut.placeOrder(req) Then: IAE
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContainingAll("region");
+    	verifyNoInteractions(products, inventory, tax);
+    }
   }
 
   @Nested class Normal {
