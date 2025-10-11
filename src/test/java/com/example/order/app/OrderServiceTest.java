@@ -49,6 +49,7 @@ class OrderServiceTest {
     	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
     	verifyNoInteractions(products, inventory, tax);
     }
+
     @Test
     @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
     void throwsWhenLinesEmpty() {
@@ -60,10 +61,10 @@ class OrderServiceTest {
     		.hasMessageContainingAll("lines");
     	verifyNoInteractions(products, inventory, tax);
     }
-    @Test
-    @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
+
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
+    @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
     void throwsWhenQtyNonPositive(int qty) {
     	// Given: qty <= 0
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
@@ -72,6 +73,7 @@ class OrderServiceTest {
 			.hasMessageContainingAll("qty");
     	verifyNoInteractions(products, inventory, tax);
     }
+
     @Test @Disabled("skeleton")
     void throwsWhenRegionBlank() {}
   }
