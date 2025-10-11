@@ -44,7 +44,7 @@ class OrderServiceTest {
   @Nested class Guards {
     @Test
     @DisplayName("G-1-1: linesが nullのとき IAEがThrowされる")
-    void throwsWhenLinesNull() {
+    void throwsWhenLinesIsNull() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
     	//When: sut.placeOrder(req) Then: IAE
@@ -54,7 +54,7 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
-    void throwsWhenLinesEmpty() {
+    void throwsWhenLinesIsEmpty() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of());
     	//When: sut.placeOrder(req) Then: IAE
@@ -67,8 +67,8 @@ class OrderServiceTest {
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
     @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
-    void throwsWhenQtyNonPositive(int qty) {
-    	// Given: qty <= 0
+    void throwsWhenQtyIsNonPositive(int qty) {
+    	// Given: qty == 0, qty <= 0 両方検証
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
     	//When: sut.placeOrder(req) Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
@@ -90,7 +90,7 @@ class OrderServiceTest {
     @ParameterizedTest
     @MethodSource("blankStrings")
     @DisplayName("G-3-1: regionが nullまたは空または空文字の時 IAEがThrowされる")
-    void throwsWhenRegionBlank(String region) {
+    void throwsWhenRegionIsBlank(String region) {
     	// Given: region = null or "" or " "etc.blank strings
     	OrderRequest req = new OrderRequest(region, RoundingMode.HALF_UP, List.of(new Line("P01", 5)));
     	//When: sut.placeOrder(req) Then: IAE
