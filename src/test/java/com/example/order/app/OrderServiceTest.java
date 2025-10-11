@@ -1,5 +1,6 @@
 package com.example.order.app;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.math.RoundingMode;
@@ -11,10 +12,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.order.dto.OrderRequest;
+import com.example.order.dto.OrderRequest.Line;
 import com.example.order.port.InventoryService;
 import com.example.order.port.ProductRepository;
 import com.example.order.port.TaxCalculator;
@@ -39,7 +43,7 @@ class OrderServiceTest {
     @DisplayName("G-1-1: linesが nullのとき IAEがThrowされる")
     void throwsWhenLinesNull() {
     	// Given: lines = null
-    	OrderRequest req = new OrderRequest("TOKYO", RoundingMode.HALF_UP, null);
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
     	//When: sut.placeOrder(req) Then: IAE
     	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
     	
@@ -48,12 +52,23 @@ class OrderServiceTest {
     @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
     void throwsWhenLinesEmpty() {
     	// Given: lines = null
-    	OrderRequest req = new OrderRequest("TOKYO", RoundingMode.HALF_UP, List.of());
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of());
     	//When: sut.placeOrder(req) Then: IAE
-    	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+    		.isInstanceOf(IllegalArgumentException.class)
+    		.hasMessageContainingAll("lines");
     }
-    @Test @Disabled("skeleton")
-    void throwsWhenQtyNonPositive() {}
+    @Test
+    @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void throwsWhenQtyNonPositive(int qty) {
+    	// Given: qty <= 0
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+		.isInstanceOf(IllegalArgumentException.class)
+		.hasMessageContainingAll("qty");
+    }
     @Test @Disabled("skeleton")
     void throwsWhenRegionBlank() {}
   }
