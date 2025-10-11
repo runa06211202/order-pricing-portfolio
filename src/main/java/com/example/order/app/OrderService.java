@@ -28,6 +28,9 @@ public class OrderService {
 			  throw new IllegalArgumentException("qty must not be zero or minus");
 		  }
 	  }
+	  if(req.region() == null || req.region().isBlank()) {
+		  throw new IllegalArgumentException("region must not be null or blank strings");
+	  }
     throw new UnsupportedOperationException("not implemented yet");
   }
 }
