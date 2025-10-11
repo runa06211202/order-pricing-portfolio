@@ -1,20 +1,39 @@
 package com.example.order.app;
 
-import com.example.order.dto.*;
-import com.example.order.port.*;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.example.order.domain.Product;
+import com.example.order.dto.OrderRequest;
+import com.example.order.dto.OrderRequest.Line;
+import com.example.order.port.InventoryService;
+import com.example.order.port.ProductRepository;
+import com.example.order.port.TaxCalculator;
 
 @ExtendWith(MockitoExtension.class)
+/**
+ * 関連ADR:
+ *  - ADR-003 Repository の findById は null を返さない（“存在しない”は Optional.empty）
+ */
 class OrderServiceTest {
 
   @Mock ProductRepository products;
@@ -30,14 +49,77 @@ class OrderServiceTest {
   }
 
   @Nested class Guards {
-    @Test @Disabled("skeleton")
-    void throwsWhenLinesNull() {}
-    @Test @Disabled("skeleton")
-    void throwsWhenLinesEmpty() {}
-    @Test @Disabled("skeleton")
-    void throwsWhenQtyNonPositive() {}
-    @Test @Disabled("skeleton")
-    void throwsWhenRegionBlank() {}
+    @Test
+    @DisplayName("G-1-1: linesが nullのとき IAEがThrowされる")
+    void throwsWhenLinesIsNull() {
+    	// Given: lines = null
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
+    	//When: sut.placeOrder(req) Then: IAE
+    	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
+    	verifyNoInteractions(products, inventory, tax);
+    }
+
+    @Test
+    @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
+    void throwsWhenLinesIsEmpty() {
+    	// Given: lines = null
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of());
+    	//When: sut.placeOrder(req) Then: IAE
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+    		.isInstanceOf(IllegalArgumentException.class)
+    		.hasMessageContainingAll("lines");
+    	verifyNoInteractions(products, inventory, tax);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
+    void throwsWhenQtyIsNonPositive(int qty) {
+    	// Given: qty == 0, qty <= 0 両方検証
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
+    	//When: sut.placeOrder(req) Then: IAE
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContainingAll("qty");
+    	verifyNoInteractions(products, inventory, tax);
+    }
+
+    static Stream<String> blankStrings() {
+        return Stream.of(
+            null,
+            "",
+            " ",
+            "   ",
+            "\t",
+            "\n"
+        );
+    }
+    @ParameterizedTest
+    @MethodSource("blankStrings")
+    @DisplayName("G-3-1: regionが nullまたは空または空文字の時 IAEがThrowされる")
+    void throwsWhenRegionIsBlank(String region) {
+    	// Given: region = null or "" or " "etc.blank strings
+    	OrderRequest req = new OrderRequest(region, RoundingMode.HALF_UP, List.of(new Line("P01", 5)));
+    	//When: sut.placeOrder(req) Then: IAE
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContainingAll("region");
+    	verifyNoInteractions(products, inventory, tax);
+    }
+
+    @Test
+    @DisplayName("G-4-1: products.findById呼出結果が 未取得の時 IAEがThrowされる")
+    void throwsWhenProductsIsNotFound() {
+    	// Given: Product.findbyIdの返却値がOptional.empty
+    	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 5), new Line("B", 5)));
+    	when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+    	when(products.findById("B")).thenReturn(Optional.empty()); // これで「Bが存在しない」ケース
+    	
+    	assertThatThrownBy(() -> sut.placeOrder(req))
+        	.isInstanceOf(IllegalArgumentException.class)
+        	.hasMessageContaining("product not found: B");
+    	verifyNoInteractions(inventory, tax);
+    }
   }
 
   @Nested class Normal {
