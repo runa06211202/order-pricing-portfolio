@@ -72,21 +72,23 @@ public class OrderService {
 	  if(volumeDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.VOLUME);
 	  }
-	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).abs().setScale(2);
+	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).setScale(2);
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal totalDiscount = BigDecimal.ZERO;
+	  BigDecimal totalNetAfterDiscount = BigDecimal.ZERO;
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = subtotalBase;
 	  totalDiscount = totalDiscount.add(volumeDiscount);
+	  totalNetAfterDiscount = subtotalVolumeDiscount;
 	  
 	  //税計算(仮)
 	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
 	  totalGross = tax.addTax(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
 	  
-	  OrderResult orderResult = new OrderResult(subtotalBase, totalDiscount, totalTax, totalGross, appliedDiscounts);
+	  OrderResult orderResult = new OrderResult(subtotalBase, totalDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
 
 	  return orderResult;
   }

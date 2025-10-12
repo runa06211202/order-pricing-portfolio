@@ -148,6 +148,7 @@ class OrderServiceTest {
 		//Then: totalNetBeforeDiscount = 1500.00, totalDiscount = 0.00
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("1500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("0.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("1500.00");
 		
 		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
 		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
@@ -171,6 +172,7 @@ class OrderServiceTest {
 		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00 appliedDiscounts = [VOLUME}
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2425.00");
 		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.VOLUME));
 		
 		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
@@ -184,14 +186,14 @@ class OrderServiceTest {
   @Nested class Threshold {
 	static Stream<Arguments> volumeDiscountThresholds() {
 		return Stream.of(
-				Arguments.of(9,  new BigDecimal("9000.00"),  new BigDecimal("0.00"), List.of()),
-				Arguments.of(10, new BigDecimal("10000.00"), new BigDecimal ("500.00"), List.of(DiscountType.VOLUME)),
-				Arguments.of(11, new BigDecimal("11000.00"), new BigDecimal ("550.00"), List.of(DiscountType.VOLUME))
+				Arguments.of(9,  new BigDecimal("9000.00"),  new BigDecimal("0.00"), new BigDecimal("9000.00"), List.of()),
+				Arguments.of(10, new BigDecimal("10000.00"), new BigDecimal ("500.00"), new BigDecimal("9500.00"), List.of(DiscountType.VOLUME)),
+				Arguments.of(11, new BigDecimal("11000.00"), new BigDecimal ("550.00"), new BigDecimal("10450.00"), List.of(DiscountType.VOLUME))
 		);
 	}
 	@ParameterizedTest
 	@MethodSource("volumeDiscountThresholds")
-    void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, List<DiscountType> expectedLabels) {
+    void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		when(products.findById("A"))
 			.thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
 
@@ -201,9 +203,14 @@ class OrderServiceTest {
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00, totalDiscount = 0.00/500.00/550.00 appliedDiscounts = []/[VOLUME}/[VOLUME}
+		/*Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00,
+		 * totalDiscount = 0.00/500.00/550.00,
+		 * totalNetAfterDiscount = 9000.00/9500.00/10450.00,
+		 * appliedDiscounts = []/[VOLUME}/[VOLUME}
+		 */
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
 		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
 	}
     @Test @Disabled("skeleton")
