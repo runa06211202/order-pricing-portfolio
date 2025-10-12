@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
@@ -181,8 +182,30 @@ class OrderServiceTest {
   }
 
   @Nested class Threshold {
-    @Test @Disabled("skeleton")
-    void volumeBoundary_qty9_10_11() {}
+	static Stream<Arguments> volumeDiscountThresholds() {
+		return Stream.of(
+				Arguments.of(9,  new BigDecimal("9000.00"),  new BigDecimal("0.00"), List.of()),
+				Arguments.of(10, new BigDecimal("10000.00"), new BigDecimal ("500.00"), List.of(DiscountType.VOLUME)),
+				Arguments.of(11, new BigDecimal("11000.00"), new BigDecimal ("550.00"), List.of(DiscountType.VOLUME))
+		);
+	}
+	@ParameterizedTest
+	@MethodSource("volumeDiscountThresholds")
+    void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, List<DiscountType> expectedLabels) {
+		when(products.findById("A"))
+			.thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
+
+		// Given: qty = 9/10/11
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", qty)));
+
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00, totalDiscount = 0.00/500.00/550.00 appliedDiscounts = []/[VOLUME}/[VOLUME}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
+		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
+		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
+	}
     @Test @Disabled("skeleton")
     void multiItemBoundary_kinds2_3_4() {}
     @Test @Disabled("skeleton")
