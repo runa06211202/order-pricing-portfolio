@@ -24,6 +24,8 @@ public class OrderService {
   private static final String QTY = "qty";
   private static final String REGION = "region";
   private static final BigDecimal VOLUME_DISCOUNT_RATE = new BigDecimal("0.05");
+  private static final BigDecimal MULTI_ITEM_DISCOUNT_RATE = new BigDecimal("0.02");
+  private static final int MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES = 3;
   
   
 
@@ -73,6 +75,17 @@ public class OrderService {
 		  appliedDiscounts.add(DiscountType.VOLUME);
 	  }
 	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).setScale(2);
+	  
+	  BigDecimal multiItemDisctount = BigDecimal.ZERO;
+	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
+	  //MULTI_ITEM割引
+	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
+		  multiItemDisctount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
+	  }
+	  if(multiItemDisctount.compareTo(BigDecimal.ZERO) == 1) {
+		  appliedDiscounts.add(DiscountType.MULTI_ITEM);
+	  }
+	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount);
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal totalDiscount = BigDecimal.ZERO;
@@ -81,12 +94,17 @@ public class OrderService {
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = subtotalBase;
-	  totalDiscount = totalDiscount.add(volumeDiscount);
-	  totalNetAfterDiscount = subtotalVolumeDiscount;
+	  totalDiscount = totalDiscount.add(volumeDiscount).add(multiItemDisctount);
+	  totalNetAfterDiscount = subtotalMultiItemDiscount;
 	  
 	  //税計算(仮)
 	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
 	  totalGross = tax.addTax(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
+	  
+	  //在庫確認(仮)
+	  for(Line line : req.lines()) {
+		  inventory.reserve(line.productId(), line.qty());
+	  }
 	  
 	  OrderResult orderResult = new OrderResult(subtotalBase, totalDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
 

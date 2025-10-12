@@ -141,6 +141,7 @@ class OrderServiceTest {
 		// モック呼出(税計算)呼出だけ確認するため任意値
 		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
 		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+		doNothing().when(inventory).reserve(eq("A"), eq(5));
 		
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
@@ -152,6 +153,7 @@ class OrderServiceTest {
 		
 		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
 		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(inventory).reserve("A", 5);
 
 	}
 	@Test
@@ -165,11 +167,13 @@ class OrderServiceTest {
 		// モック呼出(税計算)呼出だけ確認するため任意値
 		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
 		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+		doNothing().when(inventory).reserve(eq("A"), eq(15));
+		doNothing().when(inventory).reserve(eq("B"), eq(5));
 
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00 appliedDiscounts = [VOLUME}
+		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00, totalNetAfterDiscount = 2425.00, appliedDiscounts = [VOLUME}
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2425.00");
@@ -177,6 +181,47 @@ class OrderServiceTest {
 		
 		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
 		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(inventory).reserve(eq("A"), eq(15));
+		verify(inventory).reserve(eq("B"), eq(5));
+	}
+
+	@Test
+	@DisplayName("N-1-3: MULTI_ITEM割引適用")
+	void checkMultiItemDiscount() {
+		// Given: Line("A", 5)("B", 5)("C", 5)("D", 5)("E", 5)
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5), new Line("C", 5), new Line("D", 5), new Line("E", 5));
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+		when(products.findById("C")).thenReturn(Optional.of(new Product("C", new BigDecimal("300"))));
+		when(products.findById("D")).thenReturn(Optional.of(new Product("D", new BigDecimal("400"))));
+		when(products.findById("E")).thenReturn(Optional.of(new Product("E", new BigDecimal("500"))));
+
+		// モック呼出(税計算)呼出だけ確認するため任意値
+		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
+		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+		doNothing().when(inventory).reserve(eq("A"), eq(5));
+		doNothing().when(inventory).reserve(eq("B"), eq(5));
+		doNothing().when(inventory).reserve(eq("C"), eq(5));
+		doNothing().when(inventory).reserve(eq("D"), eq(5));
+		doNothing().when(inventory).reserve(eq("E"), eq(5));
+
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 7500.00, totalDiscount = 150.00, totalNetAfterDiscount = 7275.00, appliedDiscounts = [MULTI_ITEM}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("7500.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("150.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("7350.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.MULTI_ITEM));
+		
+		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(inventory).reserve(eq("A"), eq(5));
+		verify(inventory).reserve(eq("B"), eq(5));
+		verify(inventory).reserve(eq("C"), eq(5));
+		verify(inventory).reserve(eq("D"), eq(5));
+		verify(inventory).reserve(eq("E"), eq(5));
 
 	}
     @Test @Disabled("skeleton")
