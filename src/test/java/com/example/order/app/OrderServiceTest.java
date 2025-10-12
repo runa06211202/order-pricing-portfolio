@@ -18,12 +18,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.order.domain.Product;
+import com.example.order.dto.DiscountType;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
 import com.example.order.dto.OrderResult;
@@ -151,13 +153,59 @@ class OrderServiceTest {
 		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
 
 	}
+	@Test
+	@DisplayName("N-1-2: VOLUME割引適用")
+	void checkVolumeDiscount() {
+		// Given: Line("A", 15)("B", 5)
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 15), new Line("B", 5)));
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+
+		// モック呼出(税計算)呼出だけ確認するため任意値
+		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
+		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00 appliedDiscounts = [VOLUME}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.VOLUME));
+		
+		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+
+	}
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }
 
   @Nested class Threshold {
-    @Test @Disabled("skeleton")
-    void volumeBoundary_qty9_10_11() {}
+	static Stream<Arguments> volumeDiscountThresholds() {
+		return Stream.of(
+				Arguments.of(9,  new BigDecimal("9000.00"),  new BigDecimal("0.00"), List.of()),
+				Arguments.of(10, new BigDecimal("10000.00"), new BigDecimal ("500.00"), List.of(DiscountType.VOLUME)),
+				Arguments.of(11, new BigDecimal("11000.00"), new BigDecimal ("550.00"), List.of(DiscountType.VOLUME))
+		);
+	}
+	@ParameterizedTest
+	@MethodSource("volumeDiscountThresholds")
+    void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, List<DiscountType> expectedLabels) {
+		when(products.findById("A"))
+			.thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
+
+		// Given: qty = 9/10/11
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", qty)));
+
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00, totalDiscount = 0.00/500.00/550.00 appliedDiscounts = []/[VOLUME}/[VOLUME}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
+		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
+		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
+	}
     @Test @Disabled("skeleton")
     void multiItemBoundary_kinds2_3_4() {}
     @Test @Disabled("skeleton")
