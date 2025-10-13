@@ -242,7 +242,7 @@ class OrderServiceTest {
 		/*Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00,
 		 * totalDiscount = 0.00/500.00/550.00,
 		 * totalNetAfterDiscount = 9000.00/9500.00/10450.00,
-		 * appliedDiscounts = []/[VOLUME}/[VOLUME}
+		 * appliedDiscounts = []/[VOLUME]/[VOLUME]
 		 */
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
@@ -288,15 +288,42 @@ class OrderServiceTest {
 		/*Then: totalNetBeforeDiscount = 300.00/600.00/1000.00,
 		 * totalDiscount = 0.00/12.00/20.00,
 		 * totalNetAfterDiscount = 300.00/588.00/980.00,
-		 * appliedDiscounts = []/[MULTI_ITEM}/[MULTI_ITEM]
+		 * appliedDiscounts = []/[MULTI_ITEM]/[MULTI_ITEM]
 		 */
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
 		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
     }
-    @Test @Disabled("skeleton")
-    void highAmountBoundary_99999_100000_100001() {}
+
+	
+	static Stream<Arguments> highAmountDiscountThresholds() {
+		return Stream.of(
+				Arguments.of(new BigDecimal("99999.00"),List.of(new Line("A", 1)), new BigDecimal("99999.00"),  new BigDecimal("0.00"), new BigDecimal("99999.00"), List.of()),
+				Arguments.of(new BigDecimal("100000.00"),List.of(new Line("A", 1)), new BigDecimal("100000.00"), new BigDecimal ("3000.00"), new BigDecimal("97000.00"), List.of(DiscountType.HIGH_AMOUNT)),
+				Arguments.of(new BigDecimal("100001.00"),List.of(new Line("A", 1)), new BigDecimal("100001.00"), new BigDecimal ("3000.03"), new BigDecimal("97000.97"), List.of(DiscountType.HIGH_AMOUNT))
+		);
+	}
+
+	@ParameterizedTest
+	@MethodSource("highAmountDiscountThresholds")
+    void highAmountBoundary_99999_100000_100001(BigDecimal price, List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", price)));
+
+		//When: sut.placeOrder(req)
+    	OrderResult result = sut.placeOrder(req);
+
+    	/*Then: totalNetBeforeDiscount = 99999.00/100000.00/100001.00,
+		 * totalDiscount = 0.00/3000.00/3000.00,
+		 * totalNetAfterDiscount = 99999.00/97000.00/97001.00,
+		 * appliedDiscounts = []/[HIGH_AMOUNT]/[HIGH_AMOUNT]
+		 */
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
+		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
+		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
+	}
   }
 
   @Nested class VerifyCalls {
