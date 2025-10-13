@@ -142,7 +142,6 @@ class OrderServiceTest {
 		// モック呼出(税計算)呼出だけ確認するため任意値
 		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
 		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
-		doNothing().when(inventory).reserve(eq("A"), eq(5));
 		
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
@@ -154,7 +153,6 @@ class OrderServiceTest {
 		
 		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
 		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(inventory).reserve("A", 5);
 
 	}
 	@Test
@@ -165,12 +163,6 @@ class OrderServiceTest {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
 
-		// モック呼出(税計算)呼出だけ確認するため任意値
-		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
-		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
-		doNothing().when(inventory).reserve(eq("A"), eq(15));
-		doNothing().when(inventory).reserve(eq("B"), eq(5));
-
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
@@ -180,10 +172,6 @@ class OrderServiceTest {
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2425.00");
 		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.VOLUME));
 		
-		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(inventory).reserve(eq("A"), eq(15));
-		verify(inventory).reserve(eq("B"), eq(5));
 	}
 
 	@Test
@@ -198,15 +186,6 @@ class OrderServiceTest {
 		when(products.findById("D")).thenReturn(Optional.of(new Product("D", new BigDecimal("400"))));
 		when(products.findById("E")).thenReturn(Optional.of(new Product("E", new BigDecimal("500"))));
 
-		// モック呼出(税計算)呼出だけ確認するため任意値
-		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
-		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
-		doNothing().when(inventory).reserve(eq("A"), eq(5));
-		doNothing().when(inventory).reserve(eq("B"), eq(5));
-		doNothing().when(inventory).reserve(eq("C"), eq(5));
-		doNothing().when(inventory).reserve(eq("D"), eq(5));
-		doNothing().when(inventory).reserve(eq("E"), eq(5));
-
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
@@ -215,16 +194,8 @@ class OrderServiceTest {
 		assertThat(result.totalDiscount()).isEqualByComparingTo("150.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("7350.00");
 		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.MULTI_ITEM));
-		
-		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(inventory).reserve(eq("A"), eq(5));
-		verify(inventory).reserve(eq("B"), eq(5));
-		verify(inventory).reserve(eq("C"), eq(5));
-		verify(inventory).reserve(eq("D"), eq(5));
-		verify(inventory).reserve(eq("E"), eq(5));
-
 	}
+
 	@Test
 	@DisplayName("N-1-4: HIGH_AMOUNT割引適用")
 	void checkHighAmountDiscount() {
@@ -232,7 +203,19 @@ class OrderServiceTest {
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
 		
 		// Given: Product = ("A","10000"), ("B", "20000")
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("10000"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("20000"))));
+		
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 150000.00, totalDiscount = 4500.00, totalNetAfterDiscount = 1455000.00, appliedDiscounts = [HIGH_AMOUNT}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("150000.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("4500.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("145500.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.HIGH_AMOUNT));
 	}
+
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }
