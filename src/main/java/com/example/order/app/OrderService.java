@@ -25,7 +25,9 @@ public class OrderService {
   private static final String REGION = "region";
   private static final BigDecimal VOLUME_DISCOUNT_RATE = new BigDecimal("0.05");
   private static final BigDecimal MULTI_ITEM_DISCOUNT_RATE = new BigDecimal("0.02");
+  private static final BigDecimal HIGH_AMOUNT_DISCOUNT_RATE = new BigDecimal("0.03");
   private static final int MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES = 3;
+  private static final BigDecimal HIGH_AMOUNT_DISCOUNT_APPLY_NET = new BigDecimal("100000");
   
   
 
@@ -78,14 +80,26 @@ public class OrderService {
 	  
 	  BigDecimal multiItemDisctount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
-	  //MULTI_ITEM割引
+	  // MULTI_ITEM割引
 	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
 		  multiItemDisctount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
 	  }
 	  if(multiItemDisctount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.MULTI_ITEM);
 	  }
-	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount);
+	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount).setScale(2);;
+
+	  BigDecimal highAmountDisctount = BigDecimal.ZERO;
+	  BigDecimal subtotalHighAmountDiscount = BigDecimal.ZERO;
+	  
+	  // HIGH_AMOUNT割引
+	  if(subtotalMultiItemDiscount.compareTo(HIGH_AMOUNT_DISCOUNT_APPLY_NET) >= 0) {
+		  highAmountDisctount = subtotalMultiItemDiscount.multiply(HIGH_AMOUNT_DISCOUNT_RATE);
+	  }
+	  if(highAmountDisctount.compareTo(BigDecimal.ZERO) == 1) {
+		  appliedDiscounts.add(DiscountType.HIGH_AMOUNT);
+	  }
+	  subtotalHighAmountDiscount= subtotalMultiItemDiscount.subtract(highAmountDisctount).setScale(2);;
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal totalDiscount = BigDecimal.ZERO;
@@ -93,9 +107,9 @@ public class OrderService {
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
-	  totalNetBeforeDiscount = subtotalBase;
-	  totalDiscount = totalDiscount.add(volumeDiscount).add(multiItemDisctount);
-	  totalNetAfterDiscount = subtotalMultiItemDiscount;
+	  totalNetBeforeDiscount = subtotalBase.setScale(2);;
+	  totalDiscount = totalDiscount.add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);;
+	  totalNetAfterDiscount = subtotalHighAmountDiscount;
 	  
 	  //税計算(仮)
 	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);

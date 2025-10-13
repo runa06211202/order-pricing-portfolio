@@ -233,22 +233,59 @@ class OrderServiceTest {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
 
-		// モック呼出(税計算)呼出だけ確認するため任意値
-		when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.TEN);
-		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00, totalNetAfterDiscount = 2425.00, appliedDiscounts = [VOLUME}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2425.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.VOLUME));
+		
+	}
+
+	@Test
+	@DisplayName("N-1-3: MULTI_ITEM割引適用")
+	void checkMultiItemDiscount() {
+		// Given: Line("A", 5)("B", 5)("C", 5)("D", 5)("E", 5)
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5), new Line("C", 5), new Line("D", 5), new Line("E", 5));
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+		when(products.findById("C")).thenReturn(Optional.of(new Product("C", new BigDecimal("300"))));
+		when(products.findById("D")).thenReturn(Optional.of(new Product("D", new BigDecimal("400"))));
+		when(products.findById("E")).thenReturn(Optional.of(new Product("E", new BigDecimal("500"))));
 
 		//When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00 appliedDiscounts = [VOLUME}
-		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
-		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
-		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.VOLUME));
-		
-		verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-		verify(tax).addTax(any(), eq("JP"), eq(RoundingMode.HALF_UP));
-
+		//Then: totalNetBeforeDiscount = 7500.00, totalDiscount = 150.00, totalNetAfterDiscount = 7275.00, appliedDiscounts = [MULTI_ITEM}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("7500.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("150.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("7350.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.MULTI_ITEM));
 	}
+
+	@Test
+	@DisplayName("N-1-4: HIGH_AMOUNT割引適用")
+	void checkHighAmountDiscount() {
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		
+		// Given: Product = ("A","10000"), ("B", "20000")
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("10000"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("20000"))));
+		
+		//When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		//Then: totalNetBeforeDiscount = 150000.00, totalDiscount = 4500.00, totalNetAfterDiscount = 1455000.00, appliedDiscounts = [HIGH_AMOUNT}
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("150000.00");
+		assertThat(result.totalDiscount()).isEqualByComparingTo("4500.00");
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("145500.00");
+		assertThat(result.appliedDiscounts()).isEqualTo(List.of(DiscountType.HIGH_AMOUNT));
+	}
+
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }
@@ -275,7 +312,7 @@ class OrderServiceTest {
 		/*Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00,
 		 * totalDiscount = 0.00/500.00/550.00,
 		 * totalNetAfterDiscount = 9000.00/9500.00/10450.00,
-		 * appliedDiscounts = []/[VOLUME}/[VOLUME}
+		 * appliedDiscounts = []/[VOLUME]/[VOLUME]
 		 */
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
@@ -321,15 +358,42 @@ class OrderServiceTest {
 		/*Then: totalNetBeforeDiscount = 300.00/600.00/1000.00,
 		 * totalDiscount = 0.00/12.00/20.00,
 		 * totalNetAfterDiscount = 300.00/588.00/980.00,
-		 * appliedDiscounts = []/[MULTI_ITEM}/[MULTI_ITEM]
+		 * appliedDiscounts = []/[MULTI_ITEM]/[MULTI_ITEM]
 		 */
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
 		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
     }
-    @Test @Disabled("skeleton")
-    void highAmountBoundary_99999_100000_100001() {}
+
+	
+	static Stream<Arguments> highAmountDiscountThresholds() {
+		return Stream.of(
+				Arguments.of(new BigDecimal("99999.00"),List.of(new Line("A", 1)), new BigDecimal("99999.00"),  new BigDecimal("0.00"), new BigDecimal("99999.00"), List.of()),
+				Arguments.of(new BigDecimal("100000.00"),List.of(new Line("A", 1)), new BigDecimal("100000.00"), new BigDecimal ("3000.00"), new BigDecimal("97000.00"), List.of(DiscountType.HIGH_AMOUNT)),
+				Arguments.of(new BigDecimal("100001.00"),List.of(new Line("A", 1)), new BigDecimal("100001.00"), new BigDecimal ("3000.03"), new BigDecimal("97000.97"), List.of(DiscountType.HIGH_AMOUNT))
+		);
+	}
+
+	@ParameterizedTest
+	@MethodSource("highAmountDiscountThresholds")
+    void highAmountBoundary_99999_100000_100001(BigDecimal price, List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", price)));
+
+		//When: sut.placeOrder(req)
+    	OrderResult result = sut.placeOrder(req);
+
+    	/*Then: totalNetBeforeDiscount = 99999.00/100000.00/100001.00,
+		 * totalDiscount = 0.00/3000.00/3000.00,
+		 * totalNetAfterDiscount = 99999.00/97000.00/97001.00,
+		 * appliedDiscounts = []/[HIGH_AMOUNT]/[HIGH_AMOUNT]
+		 */
+		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo(expectedNet);
+		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
+		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
+		assertThat(result.appliedDiscounts()).containsExactlyElementsOf(expectedLabels);
+	}
   }
 
   @Nested class VerifyCalls {
