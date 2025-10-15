@@ -46,15 +46,15 @@ public class OrderService {
   public OrderResult placeOrder(OrderRequest req) {
 	  // 引数チェック
 	  if(req == null || req.lines() == null || req.lines().isEmpty()) {
-		  throw new IllegalArgumentException( LINES + "must not be null or empty");
+		  throw new IllegalArgumentException(notNullOrEmptyMsg("lines"));
 	  }
 	  for(Line line : req.lines()) {
 		  if(line.qty() <= 0) {
-			  throw new IllegalArgumentException(QTY + "must not be zero or minus");
+			  throw new IllegalArgumentException(notZeroOrMinus("qty"));
 		  }
 	  }
 	  if(req.region() == null || req.region().isBlank()) {
-		  throw new IllegalArgumentException(REGION + "must not be null or blank strings");
+		  throw new IllegalArgumentException(notNullOrBlankStrings("region"));
 	  }
 	  
 	  BigDecimal orderNetBeforeDiscount = BigDecimal.ZERO;
@@ -63,26 +63,24 @@ public class OrderService {
 	  for(Line line : req.lines()) {
 		  // Optional<Product>をここでunwrap
 		  Product product = products.findById(line.productId())
-				  .orElseThrow(() -> new IllegalArgumentException( "product not found: " + line.productId()));
+				  .orElseThrow(() -> new IllegalArgumentException(notFindProduct(line.productId())));
 
 		  BigDecimal lineSubtotal = product.unitPrice()
-				  .multiply(BigDecimal.valueOf(line.qty()))
-				  .setScale(2, RoundingMode.HALF_UP);
+				  .multiply(BigDecimal.valueOf(line.qty()));
 
 		  orderNetBeforeDiscount = orderNetBeforeDiscount.add(lineSubtotal);
 		  
 		  // VOLUME割引
 		  if(line.qty() >= 10) {
 			  volumeDiscount = volumeDiscount.add(lineSubtotal
-					  .multiply(VOLUME_DISCOUNT_RATE))
-					  .setScale(2);
+					  .multiply(VOLUME_DISCOUNT_RATE));
 		  }		  
 	  }
 
 	  if(volumeDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.VOLUME);
 	  }
-	  BigDecimal subtotalVolumeDiscount = orderNetBeforeDiscount.subtract(volumeDiscount).setScale(2);
+	  BigDecimal subtotalVolumeDiscount = orderNetBeforeDiscount.subtract(volumeDiscount);
 	  
 	  BigDecimal multiItemDiscount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
@@ -93,7 +91,7 @@ public class OrderService {
 	  if(multiItemDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.MULTI_ITEM);
 	  }
-	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDiscount).setScale(2);;
+	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDiscount);
 
 	  BigDecimal highAmountDiscount = BigDecimal.ZERO;
 	  
@@ -112,7 +110,7 @@ public class OrderService {
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = orderNetBeforeDiscount;
-	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount).setScale(2);
+	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount);
 
 	  // Cap適用
 	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
@@ -133,5 +131,22 @@ public class OrderService {
 			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP), totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
 
 	  return orderResult;
+  }
+
+  // エラーメッセージ定義
+  private static String notNullOrEmptyMsg(String fieldName) {
+	  return fieldName + " must not be null or empty";
+  }
+
+  private static String notZeroOrMinus(String fieldName) {
+	  return fieldName + " must not be zero or minus";
+  }
+
+  private static String notNullOrBlankStrings(String fieldName) {
+	  return fieldName + " must not be null or blank strings";
+  }
+
+  private static String notFindProduct(String productId) {
+	  return "product not found: " + productId;
   }
 }
