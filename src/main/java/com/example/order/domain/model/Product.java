@@ -1,4 +1,4 @@
-package com.example.order.domain;
+package com.example.order.domain.model;
 
 import java.math.BigDecimal;
 

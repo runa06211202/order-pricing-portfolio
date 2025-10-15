@@ -25,14 +25,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.example.order.domain.Product;
+import com.example.order.domain.model.Product;
 import com.example.order.dto.DiscountType;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
 import com.example.order.dto.OrderResult;
-import com.example.order.port.InventoryService;
-import com.example.order.port.ProductRepository;
-import com.example.order.port.TaxCalculator;
+import com.example.order.port.outbound.InventoryService;
+import com.example.order.port.outbound.ProductRepository;
+import com.example.order.port.outbound.TaxCalculator;
 
 @ExtendWith(MockitoExtension.class)
 /**
@@ -341,7 +341,7 @@ class OrderServiceTest {
  
   @Nested class FormatAndADR {
 	  @Test
-	  @Disabled("30% Cap は現行の割引率(最大10%)では到達不能。将来の割引追加時に有効化する。Refs: ADR-004")
+	  @Disabled("30% cap is a future guard Refs: ADR-004")
 	  @DisplayName("合計割引が素合計の30%を超える場合、Cap=30%で丸められる")
 	  void clampsTotalDiscountAtThirtyPercentOfSubtotal_whenRawDiscountExceedsCap() {
 		// given: Capを越える“仮定の世界”を記述（現実には到達しない）

@@ -1,7 +1,8 @@
-package com.example.order.port;
+package com.example.order.port.outbound;
 
-import com.example.order.domain.Product;
 import java.util.Optional;
+
+import com.example.order.domain.model.Product;
 
 public interface ProductRepository {
   Optional<Product> findById(String productId);

@@ -5,14 +5,14 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.order.domain.Product;
+import com.example.order.domain.model.Product;
 import com.example.order.dto.DiscountType;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
 import com.example.order.dto.OrderResult;
-import com.example.order.port.InventoryService;
-import com.example.order.port.ProductRepository;
-import com.example.order.port.TaxCalculator;
+import com.example.order.port.outbound.InventoryService;
+import com.example.order.port.outbound.ProductRepository;
+import com.example.order.port.outbound.TaxCalculator;
 
 
 
