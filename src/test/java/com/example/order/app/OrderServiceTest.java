@@ -47,12 +47,11 @@ class OrderServiceTest {
   @Mock InventoryService inventory;
   @Mock TaxCalculator tax;
 
-  // SUTは後で実装
   OrderService sut;
 
   @BeforeEach
   void setUp() {
-    sut = new OrderService(products, inventory, tax); // コンストラクタ実装はこれから
+    sut = new OrderService(products, inventory, tax);
   }
 
   @Nested class Guards {
