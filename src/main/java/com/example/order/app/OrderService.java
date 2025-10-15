@@ -57,7 +57,7 @@ public class OrderService {
 		  throw new IllegalArgumentException(REGION + "must not be null or blank strings");
 	  }
 	  
-	  BigDecimal subtotalBase = BigDecimal.ZERO;
+	  BigDecimal orderNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal volumeDiscount = BigDecimal.ZERO;
 	  List<DiscountType> appliedDiscounts = new ArrayList<DiscountType>();
 	  for(Line line : req.lines()) {
@@ -69,7 +69,7 @@ public class OrderService {
 				  .multiply(BigDecimal.valueOf(line.qty()))
 				  .setScale(2, RoundingMode.HALF_UP);
 
-		  subtotalBase = subtotalBase.add(lineSubtotal);
+		  orderNetBeforeDiscount = orderNetBeforeDiscount.add(lineSubtotal);
 		  
 		  // VOLUME割引
 		  if(line.qty() >= 10) {
@@ -82,7 +82,7 @@ public class OrderService {
 	  if(volumeDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.VOLUME);
 	  }
-	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).setScale(2);
+	  BigDecimal subtotalVolumeDiscount = orderNetBeforeDiscount.subtract(volumeDiscount).setScale(2);
 	  
 	  BigDecimal multiItemDisctount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
@@ -106,27 +106,29 @@ public class OrderService {
 	  }
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
-	  BigDecimal rawDiscount  = BigDecimal.ZERO;
+	  BigDecimal totalDiscount  = BigDecimal.ZERO;
 	  BigDecimal totalNetAfterDiscount = BigDecimal.ZERO;
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
-	  totalNetBeforeDiscount = subtotalBase.setScale(2);;
-	  rawDiscount  = rawDiscount .add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);
+	  totalNetBeforeDiscount = orderNetBeforeDiscount;
+	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);
+
 	  // Cap適用
 	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
-	  totalNetAfterDiscount = subtotalBase.subtract(cappedDiscount);
+	  totalDiscount = cappedDiscount;
+	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);	  
 	  
-	  //税計算(仮)
-	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
-	  totalGross = tax.addTax(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
+	  //税計算
+	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetBeforeDiscount, req.region(), req.mode()));
+	  totalGross = totalGross.add(tax.addTax(totalNetBeforeDiscount, req.region(), req.mode()));
 	  
 	  //在庫確認(仮)
 	  for(Line line : req.lines()) {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
 	  
-	  OrderResult orderResult = new OrderResult(subtotalBase, cappedDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
+	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2), totalDiscount.setScale(2), totalNetAfterDiscount.setScale(2), totalTax.setScale(2), totalGross.setScale(0), appliedDiscounts);
 
 	  return orderResult;
   }

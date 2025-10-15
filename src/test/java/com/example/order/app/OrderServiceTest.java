@@ -54,6 +54,9 @@ class OrderServiceTest {
   @BeforeEach
   void setUp() {
     sut = new OrderService(products, inventory, tax);
+    // 全テスト共通：デフォルトは“0税率”
+    lenient().when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
+    lenient().when(tax.addTax(any(), anyString(), any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
   @Nested class Guards {
@@ -228,20 +231,22 @@ class OrderServiceTest {
 		// Given: Product = ("A","10000"), ("B", "10000")
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("1000"))));
+		when(tax.calcTaxAmount(any(), any(), any())).thenReturn(new BigDecimal("1000.00"));
+		when(tax.addTax(any(), any(), any())).thenReturn(new BigDecimal("11000"));
 
 		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
-		when(tax.calcTaxAmount(result.totalNetAfterDiscount(), req.region(), req.mode())).thenReturn(new BigDecimal("1000.00"));
-		when(tax.addTax(result.totalNetAfterDiscount(), req.region(), req.mode())).thenReturn(new BigDecimal("11000"));
 
 		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,"JP",RoundingMode.HALF_DOWN), addTax(10000.00,"JP",RoundingMode.HALF_DOWN)
 		assertThat(result.totalTax()).isEqualByComparingTo("1000.00");
 		assertThat(result.totalGross()).isEqualByComparingTo("11000");
 		ArgumentCaptor<RoundingMode> modeCaptor = ArgumentCaptor.forClass(RoundingMode.class);
 		ArgumentCaptor<String> regionCaptor = ArgumentCaptor.forClass(String.class);
+
 		// calcTaxAmount呼び出しの引数をキャプチャ
         verify(tax).calcTaxAmount(any(), regionCaptor.capture(), modeCaptor.capture());
-        verify(tax).calcTaxAmount(any(), regionCaptor.capture(), modeCaptor.capture());
+        verify(tax).addTax(any(), regionCaptor.capture(), modeCaptor.capture());
+        
         // 確認：JP, HALF_DOWN が渡っていること
         assertThat(regionCaptor.getValue()).isEqualTo("JP");
         assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
