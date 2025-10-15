@@ -26,7 +26,9 @@
 - HIGH_AMOUNT（高額割引）<br>
 	割引後小計が `>= 100,000` のとき、さらに 3% 割引。
 - Cap（割引上限）<br>
-	`totalDiscount <= totalNetBeforeDiscount * 0.30`。現行条件では理論到達困難。テストは `@Disabled` で旗として保持。
+	`totalDiscount <= totalNetBeforeDiscount * capRate`。現行条件では理論到達困難。テストは `@Disabled` で旗として保持。
+- CapPolicy<br>
+	上記のCap上限をポリシー化。差し替え可能な安全弁として実装、ラベルは非付与 `scale=2`
 - ProductRepository<br>
 	`Optional<Product> findById(id)` を提供。`null` は返さない。存在しない場合は `Optional.empty()`。
 - InventoryService<br>
