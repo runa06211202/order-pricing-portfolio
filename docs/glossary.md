@@ -18,7 +18,8 @@
 - totalGross<br>
 	税込合計。`TaxCalculator.addTax(totalNetAfterDiscount, region, mode)` の結果を採用。公開境界で `scale=0` に正規化。
 - appliedLabels / appliedDiscounts<br>
-	適用された割引のラベル集合（例: `[VOLUME, MULTI_ITEM]`）。順序は適用順に準ずるが比較は順不同でも可。
+	適用された割引のラベル集合（例: `[VOLUME, MULTI_ITEM]`）。順序は適用順に準ずるが比較は順不同でも可。<br>
+	DiscountType型のEnumで定義(ADR-005)
 - VOLUME（数量割引）<br>
 	各行の `qty >= 10` に対し、その行小計の 5% を割引。行単位で判定・適用。
 - MULTI_ITEM（複数商品割引）<br>
