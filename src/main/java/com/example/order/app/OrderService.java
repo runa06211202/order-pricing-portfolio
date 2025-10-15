@@ -28,8 +28,6 @@ public class OrderService {
   private static final BigDecimal HIGH_AMOUNT_DISCOUNT_RATE = new BigDecimal("0.03");
   private static final int MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES = 3;
   private static final BigDecimal HIGH_AMOUNT_DISCOUNT_APPLY_NET = new BigDecimal("100000");
-  
-  
 
   public OrderService(ProductRepository products, InventoryService inventory, TaxCalculator tax) {
     this.products = products;
