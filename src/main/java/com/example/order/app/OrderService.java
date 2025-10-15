@@ -96,7 +96,6 @@ public class OrderService {
 	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount).setScale(2);;
 
 	  BigDecimal highAmountDisctount = BigDecimal.ZERO;
-	  BigDecimal subtotalHighAmountDiscount = BigDecimal.ZERO;
 	  
 	  // HIGH_AMOUNT割引
 	  if(subtotalMultiItemDiscount.compareTo(HIGH_AMOUNT_DISCOUNT_APPLY_NET) >= 0) {
@@ -105,7 +104,6 @@ public class OrderService {
 	  if(highAmountDisctount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.HIGH_AMOUNT);
 	  }
-	  subtotalHighAmountDiscount= subtotalMultiItemDiscount.subtract(highAmountDisctount).setScale(2);;
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal rawDiscount  = BigDecimal.ZERO;
