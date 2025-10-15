@@ -7,6 +7,7 @@ public record OrderResult(
     BigDecimal totalNetBeforeDiscount,
     BigDecimal totalDiscount,
     BigDecimal totalNetAfterDiscount,
+    BigDecimal totalTax,
     BigDecimal totalGross,
-    List<String> appliedDiscounts
+    List<DiscountType> appliedDiscounts // ADR-004
 ) {}
