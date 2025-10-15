@@ -84,24 +84,24 @@ public class OrderService {
 	  }
 	  BigDecimal subtotalVolumeDiscount = orderNetBeforeDiscount.subtract(volumeDiscount).setScale(2);
 	  
-	  BigDecimal multiItemDisctount = BigDecimal.ZERO;
+	  BigDecimal multiItemDiscount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
 	  // MULTI_ITEM割引
 	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
-		  multiItemDisctount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
+		  multiItemDiscount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
 	  }
-	  if(multiItemDisctount.compareTo(BigDecimal.ZERO) == 1) {
+	  if(multiItemDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.MULTI_ITEM);
 	  }
-	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount).setScale(2);;
+	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDiscount).setScale(2);;
 
-	  BigDecimal highAmountDisctount = BigDecimal.ZERO;
+	  BigDecimal highAmountDiscount = BigDecimal.ZERO;
 	  
 	  // HIGH_AMOUNT割引
 	  if(subtotalMultiItemDiscount.compareTo(HIGH_AMOUNT_DISCOUNT_APPLY_NET) >= 0) {
-		  highAmountDisctount = subtotalMultiItemDiscount.multiply(HIGH_AMOUNT_DISCOUNT_RATE);
+		  highAmountDiscount = subtotalMultiItemDiscount.multiply(HIGH_AMOUNT_DISCOUNT_RATE);
 	  }
-	  if(highAmountDisctount.compareTo(BigDecimal.ZERO) == 1) {
+	  if(highAmountDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.HIGH_AMOUNT);
 	  }
 
@@ -112,23 +112,25 @@ public class OrderService {
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = orderNetBeforeDiscount;
-	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);
+	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount).setScale(2);
 
 	  // Cap適用
 	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
 	  totalDiscount = cappedDiscount;
-	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);	  
-	  
-	  //税計算
-	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetBeforeDiscount, req.region(), req.mode()));
-	  totalGross = totalGross.add(tax.addTax(totalNetBeforeDiscount, req.region(), req.mode()));
+	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);
 	  
 	  //在庫確認(仮)
 	  for(Line line : req.lines()) {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
 	  
-	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2), totalDiscount.setScale(2), totalNetAfterDiscount.setScale(2), totalTax.setScale(2), totalGross.setScale(0), appliedDiscounts);
+	  //税計算
+	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetAfterDiscount, req.region(), req.mode()));
+	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), req.mode()));
+
+	  
+	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP),
+			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP), totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
 
 	  return orderResult;
   }
