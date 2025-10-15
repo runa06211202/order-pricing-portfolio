@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.order.domain.model.Product;
+import com.example.order.domain.policy.DiscountCapPolicy;
+import com.example.order.domain.policy.PercentCapPolicy;
 import com.example.order.dto.DiscountType;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
@@ -20,6 +22,7 @@ public class OrderService {
   private final ProductRepository products;
   private final InventoryService inventory;
   private final TaxCalculator tax;
+  private final DiscountCapPolicy capPolicy;
   private static final String LINES = "lines";
   private static final String QTY = "qty";
   private static final String REGION = "region";
@@ -29,10 +32,15 @@ public class OrderService {
   private static final int MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES = 3;
   private static final BigDecimal HIGH_AMOUNT_DISCOUNT_APPLY_NET = new BigDecimal("100000");
 
-  public OrderService(ProductRepository products, InventoryService inventory, TaxCalculator tax) {
+  public OrderService(ProductRepository products, InventoryService inventory, TaxCalculator tax, DiscountCapPolicy capPolicy) {
     this.products = products;
     this.inventory = inventory;
     this.tax = tax;
+    this.capPolicy = capPolicy;
+  }
+  
+  public OrderService(ProductRepository products, InventoryService inventory, TaxCalculator tax) {
+	  this(products, inventory, tax, new PercentCapPolicy(new BigDecimal("0.30"))); // デフォルト30%
   }
 
   public OrderResult placeOrder(OrderRequest req) {
@@ -100,14 +108,16 @@ public class OrderService {
 	  subtotalHighAmountDiscount= subtotalMultiItemDiscount.subtract(highAmountDisctount).setScale(2);;
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
-	  BigDecimal totalDiscount = BigDecimal.ZERO;
+	  BigDecimal rawDiscount  = BigDecimal.ZERO;
 	  BigDecimal totalNetAfterDiscount = BigDecimal.ZERO;
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = subtotalBase.setScale(2);;
-	  totalDiscount = totalDiscount.add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);;
-	  totalNetAfterDiscount = subtotalHighAmountDiscount;
+	  rawDiscount  = rawDiscount .add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);
+	  // Cap適用
+	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
+	  totalNetAfterDiscount = subtotalBase.subtract(cappedDiscount);
 	  
 	  //税計算(仮)
 	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
@@ -118,7 +128,7 @@ public class OrderService {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
 	  
-	  OrderResult orderResult = new OrderResult(subtotalBase, totalDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
+	  OrderResult orderResult = new OrderResult(subtotalBase, cappedDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
 
 	  return orderResult;
   }

@@ -37,10 +37,12 @@
   → 常にこの順序で適用する。
 
 - **Cap（割引上限）**
-  - 最終的な `totalDiscount` は `subtotalBeforeDiscount * 0.30` を超えない。  
-  - 超過する場合は `totalDiscount = subtotalBeforeDiscount * 0.30` に丸める。  
-  - 現行の割引率（5%+2%+3%）では理論上Capに到達しないため、  
+　- Cap実装はPolicyで注入可能、既定は30%とする
+  - 最終的な `totalDiscount` は `subtotalBeforeDiscount * capRate` を超えない。  
+  - 超過する場合は `totalDiscount = subtotalBeforeDiscount * capRate` に丸める。  
+  - 現行の割引率（5%+2%+3%）では理論上既定の30%に到達しないため、  
     **「到達不能の安全弁」として仕様上定義し、テストでは@Disabledで保持する。**
+  - `capRate`を下げてのポリシー動作確認テストを実施する
 
 - **適用順序の実装指針**
   - 割引適用ごとに中間値を保持：  

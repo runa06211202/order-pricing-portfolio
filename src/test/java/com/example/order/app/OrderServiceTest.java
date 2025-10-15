@@ -26,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.order.domain.model.Product;
+import com.example.order.domain.policy.PercentCapPolicy;
 import com.example.order.dto.DiscountType;
 import com.example.order.dto.OrderRequest;
 import com.example.order.dto.OrderRequest.Line;
@@ -60,7 +61,7 @@ class OrderServiceTest {
     void throwsWhenLinesIsNull() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
-    	//When: sut.placeOrder(req) Then: IAE
+    	// When: sut.placeOrder(req) Then: IAE
     	assertThrows(IllegalArgumentException.class, () -> sut.placeOrder(req));
     	verifyNoInteractions(products, inventory, tax);
     }
@@ -70,7 +71,7 @@ class OrderServiceTest {
     void throwsWhenLinesIsEmpty() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of());
-    	//When: sut.placeOrder(req) Then: IAE
+    	// When: sut.placeOrder(req) Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
     		.isInstanceOf(IllegalArgumentException.class)
     		.hasMessageContainingAll("lines");
@@ -83,7 +84,7 @@ class OrderServiceTest {
     void throwsWhenQtyIsNonPositive(int qty) {
     	// Given: qty == 0, qty <= 0 両方検証
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
-    	//When: sut.placeOrder(req) Then: IAE
+    	// When: sut.placeOrder(req) Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContainingAll("qty");
@@ -106,7 +107,7 @@ class OrderServiceTest {
     void throwsWhenRegionIsBlank(String region) {
     	// Given: region = null or "" or " "etc.blank strings
     	OrderRequest req = new OrderRequest(region, RoundingMode.HALF_UP, List.of(new Line("P01", 5)));
-    	//When: sut.placeOrder(req) Then: IAE
+    	// When: sut.placeOrder(req) Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContainingAll("region");
@@ -121,7 +122,7 @@ class OrderServiceTest {
     	when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
     	when(products.findById("B")).thenReturn(Optional.empty()); // これで「Bが存在しない」ケース
 
-    	//When: findById("B") Then: IAE
+    	// When: findById("B") Then: IAE
     	assertThatThrownBy(() -> sut.placeOrder(req))
         	.isInstanceOf(IllegalArgumentException.class)
         	.hasMessageContaining("product not found: B");
@@ -143,10 +144,10 @@ class OrderServiceTest {
 		when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ONE);
 		doNothing().when(inventory).reserve(eq("A"), eq(5));
 		
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 1500.00, totalDiscount = 0.00
+		// Then: totalNetBeforeDiscount = 1500.00, totalDiscount = 0.00
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("1500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("0.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("1500.00");
@@ -165,15 +166,14 @@ class OrderServiceTest {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
 
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00, totalNetAfterDiscount = 2425.00, appliedDiscounts = [VOLUME}
+		// Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 75.00, totalNetAfterDiscount = 2425.00, appliedDiscounts = [VOLUME}
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("75.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2425.00");
-		assertThat(result.appliedDiscounts()).containsExactlyInAnyOrderElementsOf(List.of(DiscountType.VOLUME));
-		
+		assertThat(result.appliedDiscounts()).containsExactlyInAnyOrderElementsOf(List.of(DiscountType.VOLUME));	
 	}
 
 	@Test
@@ -188,10 +188,10 @@ class OrderServiceTest {
 		when(products.findById("D")).thenReturn(Optional.of(new Product("D", new BigDecimal("400"))));
 		when(products.findById("E")).thenReturn(Optional.of(new Product("E", new BigDecimal("500"))));
 
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 7500.00, totalDiscount = 150.00, totalNetAfterDiscount = 7275.00, appliedDiscounts = [MULTI_ITEM}
+		// Then: totalNetBeforeDiscount = 7500.00, totalDiscount = 150.00, totalNetAfterDiscount = 7275.00, appliedDiscounts = [MULTI_ITEM}
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("7500.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("150.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("7350.00");
@@ -208,10 +208,10 @@ class OrderServiceTest {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("10000"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("20000"))));
 		
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		//Then: totalNetBeforeDiscount = 150000.00, totalDiscount = 4500.00, totalNetAfterDiscount = 1455000.00, appliedDiscounts = [HIGH_AMOUNT}
+		// Then: totalNetBeforeDiscount = 150000.00, totalDiscount = 4500.00, totalNetAfterDiscount = 1455000.00, appliedDiscounts = [HIGH_AMOUNT}
 		assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("150000.00");
 		assertThat(result.totalDiscount()).isEqualByComparingTo("4500.00");
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("145500.00");
@@ -238,10 +238,10 @@ class OrderServiceTest {
 		// Given: qty = 9/10/11
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", qty)));
 
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		/*Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00,
+		/* Then: totalNetBeforeDiscount = 9000.00/10000.00/11000.00,
 		 * totalDiscount = 0.00/500.00/550.00,
 		 * totalNetAfterDiscount = 9000.00/9500.00/10450.00,
 		 * appliedDiscounts = []/[VOLUME]/[VOLUME]
@@ -283,11 +283,11 @@ class OrderServiceTest {
     	// Given: line.size() = 2/3/4
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
 
-    	//When: sut.placeOrder(req)
+    	// When: sut.placeOrder(req)
     	sut = new OrderService(fakeRepo, inventory, tax);
     	OrderResult result = sut.placeOrder(req);
     	
-		/*Then: totalNetBeforeDiscount = 300.00/600.00/1000.00,
+		/* Then: totalNetBeforeDiscount = 300.00/600.00/1000.00,
 		 * totalDiscount = 0.00/12.00/20.00,
 		 * totalNetAfterDiscount = 300.00/588.00/980.00,
 		 * appliedDiscounts = []/[MULTI_ITEM]/[MULTI_ITEM]
@@ -314,10 +314,10 @@ class OrderServiceTest {
 		// Given: Product.price = 99999/100000/100001
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", price)));
 
-		//When: sut.placeOrder(req)
+		// When: sut.placeOrder(req)
     	OrderResult result = sut.placeOrder(req);
 
-    	/*Then: totalNetBeforeDiscount = 99999.00/100000.00/100001.00,
+    	/* Then: totalNetBeforeDiscount = 99999.00/100000.00/100001.00,
 		 * totalDiscount = 0.00/3000.00/3000.00,
 		 * totalNetAfterDiscount = 99999.00/97000.00/97001.00,
 		 * appliedDiscounts = []/[HIGH_AMOUNT]/[HIGH_AMOUNT]
@@ -344,34 +344,57 @@ class OrderServiceTest {
 	  @Disabled("30% cap is a future guard Refs: ADR-004")
 	  @DisplayName("合計割引が素合計の30%を超える場合、Cap=30%で丸められる")
 	  void clampsTotalDiscountAtThirtyPercentOfSubtotal_whenRawDiscountExceedsCap() {
-		// given: Capを越える“仮定の世界”を記述（現実には到達しない）
-		    // 例: 小計をSとし、仮に原始割引が0.45Sになったとすると、結果は0.30Sで固定されるべき。
-		    var lines = List.of(
-		        new Line("A", 10), // VOLUMEを起動しやすい条件
-		        new Line("B", 10),
-		        new Line("C", 10)
-		    );
-		    when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("10000"))));
-		    when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("20000"))));
-		    when(products.findById("C")).thenReturn(Optional.of(new Product("C", new BigDecimal("30000"))));
-		    // 税はこのテストの主題外：呼出確認のみで値検証はしない
-		    when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
-		    when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
+		  // Given: Capを越える“仮定の世界”を記述（現実には到達しない）
+		  // 例: 小計をSとし、仮に原始割引が0.45Sになったとすると、結果は0.30Sで固定されるべき。
+		  var lines = List.of(
+				  new Line("A", 10), // VOLUMEを起動しやすい条件
+				  new Line("B", 10),
+				  new Line("C", 10)
+				  );
+		  when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("10000"))));
+		  when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("20000"))));
+		  when(products.findById("C")).thenReturn(Optional.of(new Product("C", new BigDecimal("30000"))));
+		  // 税はこのテストの主題外：呼出確認のみで値検証はしない
+		  when(tax.addTax(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
+		  when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
 
-		    var req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
+		  var req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
 
-		    // when
-		    var result = sut.placeOrder(req);
+		  // When
+		  var result = sut.placeOrder(req);
 
-		    // then: 期待だけを“仕様として”残す（今は到達不能のため Disabled）
-		    BigDecimal subtotal = new BigDecimal("600000.00"); // 10000*10 + 20000*10 + 30000*10
-		    BigDecimal cap = subtotal.multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP);
+		  // Then: 期待だけを“仕様として”残す（今は到達不能のため Disabled）
+		  BigDecimal subtotal = new BigDecimal("600000.00"); // 10000*10 + 20000*10 + 30000*10
+		  BigDecimal cap = subtotal.multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP);
 
-		    // 現行実装では totalDiscount ≒ 0.10S しかならないが、
-		    // 仕様としては “原始割引がCap超えなら totalDiscount = 0.30S に丸める”ことを宣言する。
-		    assertThat(result.totalDiscount()).isEqualByComparingTo(cap);
-		    // ラベルは Cap を追加しない（適用済み割引の記録のみ）
-		    // assertThat(result.appliedDiscounts()).doesNotContain(DiscountType.valueOf("CAP"));
+		  // 現行実装では totalDiscount ≒ 0.10S しかならないが、
+		  // 仕様としては “原始割引がCap超えなら totalDiscount = 0.30S に丸める”ことを宣言する。
+		  assertThat(result.totalDiscount()).isEqualByComparingTo(cap);
+		  // ラベルは Cap を追加しない（適用済み割引の記録のみ）
+		  // assertThat(result.appliedDiscounts()).doesNotContain(DiscountType.valueOf("CAP"));
+	  }
+
+	  @Test
+	  @DisplayName("割引ポリシー確認テスト")
+	  void checkCapPolicy() {
+			// Given: Line("A", 15)("B", 5)
+			OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 15), new Line("B", 5)));
+			when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+			when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+
+			
+			// Given: PersentPolicy = 0.02
+			OrderService sut = new OrderService(products, inventory, tax, new PercentCapPolicy(new BigDecimal("0.02")));
+			
+			// When: sut.placeOrder(req)
+			OrderResult result = sut.placeOrder(req);
+
+			// Then: totalNetBeforeDiscount = 2500.00, totalDiscount = 50.00, totalNetAfterDiscount = 2450.00, appliedDiscounts = [VOLUME}
+			assertThat(result.totalNetBeforeDiscount()).isEqualByComparingTo("2500.00");
+			assertThat(result.totalDiscount()).isEqualByComparingTo("50.00");
+			assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("2450.00");
+			assertThat(result.appliedDiscounts()).containsExactlyInAnyOrderElementsOf(List.of(DiscountType.VOLUME));	
+
 	  }
   }
 }

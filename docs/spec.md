@@ -13,7 +13,7 @@
 1. VOLUME: 各行 qty≥10 の行に 5% OFF  
 2. MULTI_ITEM: 異なる商品3種以上で 2% OFF  
 3. HIGH_AMOUNT: 割引後小計≥100,000 なら 3% OFF  
-※合計割引は素合計の30%を上限（Cap）
+4. 合計割引は素合計の30%を上限（CapPolicy注入にて設定可能。注入無しの場合既定の30％）
 
 ## 例外ポリシー
 - lines が null / 空 → IllegalArgumentException  
