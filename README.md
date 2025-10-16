@@ -14,3 +14,5 @@ mvn -q -DskipTests=false test
 ```
 テストレポートは target/surefire-reports に出力されます。
 JaCoCo によるカバレッジ計測は mvn verify で有効になります。
+
+シーケンス図 1枚（find→calc→reserve→tax→cap適用箇所）を後段で追加する予定
