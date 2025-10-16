@@ -120,7 +120,7 @@ public class OrderService {
 	  totalDiscount = cappedDiscount;
 	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);
 	  
-	  //在庫確認(仮)
+	  //在庫確認
 	  for(Line line : req.lines()) {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
@@ -131,7 +131,8 @@ public class OrderService {
 	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), modeOrDefault));
 
 	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP),
-			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP), totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
+			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP),
+			  totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
 
 	  return orderResult;
   }
