@@ -64,7 +64,7 @@ class OrderServiceTest {
   @Nested class Guards {
     @Test
     @DisplayName("G-1-1: linesが nullのとき IAEがThrowされる")
-    void throwsWhenLinesIsNull() {
+    void throws_when_lines_is_null() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, null);
     	// When: sut.placeOrder(req) Then: IAE
@@ -74,7 +74,7 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("G-1-2: linesが 空のとき IAEがThrowされる")
-    void throwsWhenLinesIsEmpty() {
+    void throws_when_lines_is_empty() {
     	// Given: lines = null
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of());
     	// When: sut.placeOrder(req) Then: IAE
@@ -87,7 +87,7 @@ class OrderServiceTest {
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
     @DisplayName("G-2-1: qtyが 0>=の時 IAEがThrowされる")
-    void throwsWhenQtyIsNonPositive(int qty) {
+    void throws_when_qty_is_non_positive(int qty) {
     	// Given: qty == 0, qty <= 0 両方検証
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("P01", qty)));
     	// When: sut.placeOrder(req) Then: IAE
@@ -110,7 +110,7 @@ class OrderServiceTest {
     @ParameterizedTest
     @MethodSource("blankStrings")
     @DisplayName("G-3-1: regionが nullまたは空または空文字の時 IAEがThrowされる")
-    void throwsWhenRegionIsBlank(String region) {
+    void throws_when_region_is_blank(String region) {
     	// Given: region = null or "" or " "etc.blank strings
     	OrderRequest req = new OrderRequest(region, RoundingMode.HALF_UP, List.of(new Line("P01", 5)));
     	// When: sut.placeOrder(req) Then: IAE
@@ -122,7 +122,7 @@ class OrderServiceTest {
 
     @Test
     @DisplayName("G-4-1: products.findById呼出結果が 未取得の時 IAEがThrowされる")
-    void throwsWhenProductsIsNotFound() {
+    void throws_when_products_is_not_found() {
     	// Given: Product.findbyIdの返却値がOptional.empty
     	OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 5), new Line("B", 5)));
     	when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
@@ -139,7 +139,7 @@ class OrderServiceTest {
   @Nested class Normal {
 	@Test
 	@DisplayName("N-1-1: 割引適用無し")
-	void checkNoDiscount() {
+	void check_no_discount_applicate() {
 		// Given: Line("A", 5)("B", 5)
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 5), new Line("B", 5)));
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
@@ -166,7 +166,7 @@ class OrderServiceTest {
 
 	@Test
 	@DisplayName("N-1-2: VOLUME割引適用")
-	void checkVolumeDiscount() {
+	void check_volume_discount_applicate() {
 		// Given: Line("A", 15)("B", 5)
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 15), new Line("B", 5)));
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
@@ -184,7 +184,7 @@ class OrderServiceTest {
 
 	@Test
 	@DisplayName("N-1-3: MULTI_ITEM割引適用")
-	void checkMultiItemDiscount() {
+	void check_multi_item_discount_applicate() {
 		// Given: Line("A", 5)("B", 5)("C", 5)("D", 5)("E", 5)
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5), new Line("C", 5), new Line("D", 5), new Line("E", 5));
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
@@ -206,7 +206,7 @@ class OrderServiceTest {
 
 	@Test
 	@DisplayName("N-1-4: HIGH_AMOUNT割引適用")
-	void checkHighAmountDiscount() {
+	void check_high_amount_discount_applicate() {
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
 		
@@ -226,7 +226,7 @@ class OrderServiceTest {
 
 	@Test
 	@DisplayName("N-2-1: TaxCalculator mode指定あり")
-	void checkModeExist() {
+	void check_taxCalclator_mode_exist() {
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
 		// Given: OrderRequest = any(), RoundingMode.HALF_DOWN, lines 割引なしになるよう設定
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
@@ -254,7 +254,7 @@ class OrderServiceTest {
 
 	@Test
 	@DisplayName("N-2-2: TaxCalculator mode指定なし(null)")
-	void checkModeNull() {
+	void check_taxCalclator_mode_null() {
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
 		// Given: OrderRequest = any(), null, lines 割引なしになるよう設定
 		OrderRequest req = new OrderRequest("JP", null, lines);
@@ -391,6 +391,26 @@ class OrderServiceTest {
 		assertThat(result.totalDiscount()).isEqualByComparingTo(expectedDiscount);
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo(expectedAfterDiscount);
 		assertThat(result.appliedDiscounts()).containsExactlyInAnyOrderElementsOf(expectedLabels);
+	}
+
+	@Test
+	@DisplayName("T-2-1: スケールと正規化確認 ADR-001")
+	void normalize_scale_of_gross_and_tax() {
+		// Given
+        when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100000"))));
+        when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(new BigDecimal("10000.4999")); // scale=4
+        when(tax.addTax(any(), anyString(), any())).thenReturn(new BigDecimal("110000.49")); // scale=2
+
+        OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 1)));
+
+        // When
+        OrderResult result = sut.placeOrder(req);
+
+        // Then: スケールと金額の確認
+        assertThat(result.totalGross().scale()).isEqualTo(0);
+        assertThat(result.totalGross()).isEqualByComparingTo("110000");
+        assertThat(result.totalTax().scale()).isEqualTo(2);
+        assertThat(result.totalTax()).isEqualByComparingTo("10000.50");
 	}
   }
 
