@@ -82,6 +82,7 @@ public class OrderService {
 	  
 	  BigDecimal multiItemDiscount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
+
 	  // MULTI_ITEM割引
 	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
 		  multiItemDiscount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
@@ -108,10 +109,10 @@ public class OrderService {
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
 	  totalNetBeforeDiscount = orderNetBeforeDiscount;
-	  BigDecimal rawDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount);
+	  BigDecimal rawTotalDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount);
 
 	  // Cap適用
-	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
+	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawTotalDiscount);
 	  totalDiscount = cappedDiscount;
 	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);
 	  
@@ -125,7 +126,6 @@ public class OrderService {
 	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetAfterDiscount, req.region(), modeOrDefault));
 	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), modeOrDefault));
 
-	  
 	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP),
 			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP), totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
 
