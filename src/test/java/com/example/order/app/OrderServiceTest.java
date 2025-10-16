@@ -444,6 +444,27 @@ class OrderServiceTest {
 
         assertThat(regionCap.getValue()).isEqualTo("JP");
         assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
+
+        // 余計な呼び出しが無いこと
+        inOrder.verifyNoMoreInteractions();
+        verifyNoMoreInteractions(products, inventory, tax);
+    }
+
+    @Test
+    @DisplayName("V-1-2: mode が null のとき HALF_UP が渡る（デフォルト）")
+    void order_passes_HALF_UP_when_mode_is_null() {
+    	// Given: Product = (["A", "1000"])
+        stubProductsPriceTable(Map.of("A", "1000"));
+        OrderRequest req = new OrderRequest("JP", null, List.of(new OrderRequest.Line("A", 1)));
+
+        // When: sut.placeOrder(req)
+        sut.placeOrder(req);
+
+        // Then: modeCap = RoundingMode.HALF_UP
+        ArgumentCaptor<RoundingMode> modeCap = ArgumentCaptor.forClass(RoundingMode.class);
+        verify(tax).calcTaxAmount(any(), anyString(), modeCap.capture());
+        verify(tax).addTax(any(), anyString(), eq(modeCap.getValue()));
+        assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_UP);
     }
   }
 
