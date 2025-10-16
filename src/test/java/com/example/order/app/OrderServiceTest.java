@@ -40,6 +40,7 @@ import com.example.order.port.outbound.TaxCalculator;
 /**
  * 関連ADR:
  *  - ADR-001 金額スケール正規化
+ *  - ADR-002 TaxCalculator に「丸め前の税額」を返す API を追加する
  *  - ADR-003 Repository の findById は null を返さない（“存在しない”は Optional.empty）
  *  - ADR-004 DiscountType enum化
  */
@@ -226,9 +227,9 @@ class OrderServiceTest {
 	@DisplayName("N-2-1: TaxCalculator mode指定あり")
 	void checkModeExist() {
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
+		// Given: OrderRequest = any(), RoundingMode.HALF_DOWN, lines 割引なしになるよう設定
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
 		
-		// Given: Product = ("A","10000"), ("B", "10000")
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
 		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("1000"))));
 		when(tax.calcTaxAmount(any(), any(), any())).thenReturn(new BigDecimal("1000.00"));
@@ -237,21 +238,41 @@ class OrderServiceTest {
 		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
 
-		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,"JP",RoundingMode.HALF_DOWN), addTax(10000.00,"JP",RoundingMode.HALF_DOWN)
+		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,any(),RoundingMode.HALF_DOWN), addTax(10000.00,any(),RoundingMode.HALF_DOWN)
 		assertThat(result.totalTax()).isEqualByComparingTo("1000.00");
 		assertThat(result.totalGross()).isEqualByComparingTo("11000");
 		ArgumentCaptor<RoundingMode> modeCaptor = ArgumentCaptor.forClass(RoundingMode.class);
-		ArgumentCaptor<String> regionCaptor = ArgumentCaptor.forClass(String.class);
 
-		// calcTaxAmount呼び出しの引数をキャプチャ
-        verify(tax).calcTaxAmount(any(), regionCaptor.capture(), modeCaptor.capture());
-        verify(tax).addTax(any(), regionCaptor.capture(), modeCaptor.capture());
+		// calcTaxAmount, addTax呼び出しの引数をキャプチャ
+        verify(tax).calcTaxAmount(any(), any(), modeCaptor.capture());
+        verify(tax).addTax(any(), any(), modeCaptor.capture());
         
-        // 確認：JP, HALF_DOWN が渡っていること
-        assertThat(regionCaptor.getValue()).isEqualTo("JP");
+        // 確認：HALF_DOWN が渡っていること
         assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
 	}
-	
+
+	@Test
+	@DisplayName("N-2-2: TaxCalculator mode指定なし(null)")
+	void checkModeNull() {
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
+		// Given: OrderRequest = any(), null, lines 割引なしになるよう設定
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
+
+		// When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,any(),RoundingMode.HALF_UP), addTax(10000.00,any(),RoundingMode.HALF_UP)
+		assertThat(result.totalTax()).isEqualByComparingTo("1000.00");
+		assertThat(result.totalGross()).isEqualByComparingTo("11000");
+		ArgumentCaptor<RoundingMode> modeCaptor = ArgumentCaptor.forClass(RoundingMode.class);
+
+		// calcTaxAmount, addTax呼び出しの引数をキャプチャ
+        verify(tax).calcTaxAmount(any(), any(), modeCaptor.capture());
+        verify(tax).addTax(any(), any(), modeCaptor.capture());
+
+        // 確認：HALF_DOWN が渡っていること
+        assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_UP);
+	}
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }

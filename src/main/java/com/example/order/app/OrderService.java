@@ -44,6 +44,7 @@ public class OrderService {
   }
 
   public OrderResult placeOrder(OrderRequest req) {
+	  // Ref: 後で全体的にメソッド分割
 	  // 引数チェック
 	  if(req == null || req.lines() == null || req.lines().isEmpty()) {
 		  throw new IllegalArgumentException(notNullOrEmptyMsg("lines"));
