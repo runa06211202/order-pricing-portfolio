@@ -6,6 +6,8 @@
 	税計算で使う地域コード（例: `JP`）。空白・null はエラー。
 - mode<br>
 	税計算の丸めモード（`RoundingMode`）。null の場合は `HALF_UP` を既定とする。
+- modeOrDefault<br>
+	税計算に渡す丸めモード（`RoundingMode`）。modeがnullか判定しnull の場合は `HALF_UP` 、nullで無い場合はmodeの値を適用する。
 - subtotal / totalNetBeforeDiscount<br>
 	割引適用前の注文素合計（行小計の合計）。内部では `subtotalBase` とも呼ぶ。scale=2。
 - totalDiscount<br>

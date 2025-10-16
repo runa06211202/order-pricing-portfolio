@@ -23,9 +23,6 @@ public class OrderService {
   private final InventoryService inventory;
   private final TaxCalculator tax;
   private final DiscountCapPolicy capPolicy;
-  private static final String LINES = "lines";
-  private static final String QTY = "qty";
-  private static final String REGION = "region";
   private static final BigDecimal VOLUME_DISCOUNT_RATE = new BigDecimal("0.05");
   private static final BigDecimal MULTI_ITEM_DISCOUNT_RATE = new BigDecimal("0.02");
   private static final BigDecimal HIGH_AMOUNT_DISCOUNT_RATE = new BigDecimal("0.03");
@@ -44,92 +41,111 @@ public class OrderService {
   }
 
   public OrderResult placeOrder(OrderRequest req) {
+	  // Ref: 後で全体的にメソッド分割
 	  // 引数チェック
 	  if(req == null || req.lines() == null || req.lines().isEmpty()) {
-		  throw new IllegalArgumentException( LINES + "must not be null or empty");
+		  throw new IllegalArgumentException(notNullOrEmptyMsg("lines"));
 	  }
 	  for(Line line : req.lines()) {
 		  if(line.qty() <= 0) {
-			  throw new IllegalArgumentException(QTY + "must not be zero or minus");
+			  throw new IllegalArgumentException(notZeroOrMinus("qty"));
 		  }
 	  }
 	  if(req.region() == null || req.region().isBlank()) {
-		  throw new IllegalArgumentException(REGION + "must not be null or blank strings");
+		  throw new IllegalArgumentException(notNullOrBlankStrings("region"));
 	  }
 	  
-	  BigDecimal subtotalBase = BigDecimal.ZERO;
+	  BigDecimal orderNetBeforeDiscount = BigDecimal.ZERO;
 	  BigDecimal volumeDiscount = BigDecimal.ZERO;
 	  List<DiscountType> appliedDiscounts = new ArrayList<DiscountType>();
 	  for(Line line : req.lines()) {
 		  // Optional<Product>をここでunwrap
 		  Product product = products.findById(line.productId())
-				  .orElseThrow(() -> new IllegalArgumentException( "product not found: " + line.productId()));
+				  .orElseThrow(() -> new IllegalArgumentException(notFindProduct(line.productId())));
 
 		  BigDecimal lineSubtotal = product.unitPrice()
-				  .multiply(BigDecimal.valueOf(line.qty()))
-				  .setScale(2, RoundingMode.HALF_UP);
+				  .multiply(BigDecimal.valueOf(line.qty()));
 
-		  subtotalBase = subtotalBase.add(lineSubtotal);
+		  orderNetBeforeDiscount = orderNetBeforeDiscount.add(lineSubtotal);
 		  
 		  // VOLUME割引
 		  if(line.qty() >= 10) {
 			  volumeDiscount = volumeDiscount.add(lineSubtotal
-					  .multiply(VOLUME_DISCOUNT_RATE))
-					  .setScale(2);
+					  .multiply(VOLUME_DISCOUNT_RATE));
 		  }		  
 	  }
 
 	  if(volumeDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.VOLUME);
 	  }
-	  BigDecimal subtotalVolumeDiscount = subtotalBase.subtract(volumeDiscount).setScale(2);
+	  BigDecimal subtotalVolumeDiscount = orderNetBeforeDiscount.subtract(volumeDiscount);
 	  
-	  BigDecimal multiItemDisctount = BigDecimal.ZERO;
+	  BigDecimal multiItemDiscount = BigDecimal.ZERO;
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
+
 	  // MULTI_ITEM割引
 	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
-		  multiItemDisctount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
+		  multiItemDiscount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
 	  }
-	  if(multiItemDisctount.compareTo(BigDecimal.ZERO) == 1) {
+	  if(multiItemDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.MULTI_ITEM);
 	  }
-	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDisctount).setScale(2);;
+	  subtotalMultiItemDiscount = subtotalVolumeDiscount.subtract(multiItemDiscount);
 
-	  BigDecimal highAmountDisctount = BigDecimal.ZERO;
-	  BigDecimal subtotalHighAmountDiscount = BigDecimal.ZERO;
+	  BigDecimal highAmountDiscount = BigDecimal.ZERO;
 	  
 	  // HIGH_AMOUNT割引
 	  if(subtotalMultiItemDiscount.compareTo(HIGH_AMOUNT_DISCOUNT_APPLY_NET) >= 0) {
-		  highAmountDisctount = subtotalMultiItemDiscount.multiply(HIGH_AMOUNT_DISCOUNT_RATE);
+		  highAmountDiscount = subtotalMultiItemDiscount.multiply(HIGH_AMOUNT_DISCOUNT_RATE);
 	  }
-	  if(highAmountDisctount.compareTo(BigDecimal.ZERO) == 1) {
+	  if(highAmountDiscount.compareTo(BigDecimal.ZERO) == 1) {
 		  appliedDiscounts.add(DiscountType.HIGH_AMOUNT);
 	  }
-	  subtotalHighAmountDiscount= subtotalMultiItemDiscount.subtract(highAmountDisctount).setScale(2);;
 
 	  BigDecimal totalNetBeforeDiscount = BigDecimal.ZERO;
-	  BigDecimal rawDiscount  = BigDecimal.ZERO;
+	  BigDecimal totalDiscount  = BigDecimal.ZERO;
 	  BigDecimal totalNetAfterDiscount = BigDecimal.ZERO;
 	  BigDecimal totalTax = BigDecimal.ZERO;
 	  BigDecimal totalGross = BigDecimal.ZERO;
 
-	  totalNetBeforeDiscount = subtotalBase.setScale(2);;
-	  rawDiscount  = rawDiscount .add(volumeDiscount).add(multiItemDisctount).add(highAmountDisctount).setScale(2);
+	  totalNetBeforeDiscount = orderNetBeforeDiscount;
+	  BigDecimal rawTotalDiscount  = BigDecimal.ZERO.add(volumeDiscount).add(multiItemDiscount).add(highAmountDiscount);
+
 	  // Cap適用
-	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawDiscount);
-	  totalNetAfterDiscount = subtotalBase.subtract(cappedDiscount);
-	  
-	  //税計算(仮)
-	  totalTax = tax.calcTaxAmount(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
-	  totalGross = tax.addTax(totalNetBeforeDiscount, "JP", RoundingMode.HALF_UP);
+	  BigDecimal cappedDiscount = capPolicy.apply(totalNetBeforeDiscount, rawTotalDiscount);
+	  totalDiscount = cappedDiscount;
+	  totalNetAfterDiscount = orderNetBeforeDiscount.subtract(cappedDiscount);
 	  
 	  //在庫確認(仮)
 	  for(Line line : req.lines()) {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
-	  
-	  OrderResult orderResult = new OrderResult(subtotalBase, cappedDiscount, totalNetAfterDiscount, totalTax, totalGross, appliedDiscounts);
+
+	  RoundingMode modeOrDefault = (req.mode() == null) ? RoundingMode.HALF_UP : req.mode();
+	  //税計算
+	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetAfterDiscount, req.region(), modeOrDefault));
+	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), modeOrDefault));
+
+	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP),
+			  totalNetAfterDiscount.setScale(2, RoundingMode.HALF_UP), totalTax.setScale(2, RoundingMode.HALF_UP), totalGross.setScale(0, RoundingMode.HALF_UP), appliedDiscounts);
 
 	  return orderResult;
+  }
+
+  // エラーメッセージ定義
+  private static String notNullOrEmptyMsg(String fieldName) {
+	  return fieldName + " must not be null or empty";
+  }
+
+  private static String notZeroOrMinus(String fieldName) {
+	  return fieldName + " must not be zero or minus";
+  }
+
+  private static String notNullOrBlankStrings(String fieldName) {
+	  return fieldName + " must not be null or blank strings";
+  }
+
+  private static String notFindProduct(String productId) {
+	  return "product not found: " + productId;
   }
 }

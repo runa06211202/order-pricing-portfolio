@@ -22,6 +22,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -39,6 +41,7 @@ import com.example.order.port.outbound.TaxCalculator;
 /**
  * 関連ADR:
  *  - ADR-001 金額スケール正規化
+ *  - ADR-002 TaxCalculator に「丸め前の税額」を返す API を追加する
  *  - ADR-003 Repository の findById は null を返さない（“存在しない”は Optional.empty）
  *  - ADR-004 DiscountType enum化
  */
@@ -53,6 +56,9 @@ class OrderServiceTest {
   @BeforeEach
   void setUp() {
     sut = new OrderService(products, inventory, tax);
+    // 全テスト共通：デフォルトは“0税率”
+    lenient().when(tax.calcTaxAmount(any(), anyString(), any())).thenReturn(BigDecimal.ZERO);
+    lenient().when(tax.addTax(any(), anyString(), any())).thenAnswer(inv -> inv.getArgument(0));
   }
 
   @Nested class Guards {
@@ -217,7 +223,63 @@ class OrderServiceTest {
 		assertThat(result.totalNetAfterDiscount()).isEqualByComparingTo("145500.00");
 		assertThat(result.appliedDiscounts()).containsExactlyInAnyOrderElementsOf(List.of(DiscountType.HIGH_AMOUNT));
 	}
-	
+
+	@Test
+	@DisplayName("N-2-1: TaxCalculator mode指定あり")
+	void checkModeExist() {
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
+		// Given: OrderRequest = any(), RoundingMode.HALF_DOWN, lines 割引なしになるよう設定
+		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
+		
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("1000"))));
+		when(tax.calcTaxAmount(any(), any(), any())).thenReturn(new BigDecimal("1000.00"));
+		when(tax.addTax(any(), any(), any())).thenReturn(new BigDecimal("11000"));
+
+		// When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,any(),RoundingMode.HALF_DOWN), addTax(10000.00,any(),RoundingMode.HALF_DOWN)
+		assertThat(result.totalTax()).isEqualByComparingTo("1000.00");
+		assertThat(result.totalGross()).isEqualByComparingTo("11000");
+		ArgumentCaptor<RoundingMode> modeCaptor = ArgumentCaptor.forClass(RoundingMode.class);
+
+		// calcTaxAmount, addTax呼び出しの引数をキャプチャ
+        verify(tax).calcTaxAmount(any(), any(), modeCaptor.capture());
+        verify(tax).addTax(any(), any(), modeCaptor.capture());
+        
+        // 確認：HALF_DOWN が渡っていること
+        assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
+	}
+
+	@Test
+	@DisplayName("N-2-2: TaxCalculator mode指定なし(null)")
+	void checkModeNull() {
+		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
+		// Given: OrderRequest = any(), null, lines 割引なしになるよう設定
+		OrderRequest req = new OrderRequest("JP", null, lines);
+
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("1000"))));
+		when(tax.calcTaxAmount(any(), any(), any())).thenReturn(new BigDecimal("1000.00"));
+		when(tax.addTax(any(), any(), any())).thenReturn(new BigDecimal("11000"));
+
+		// When: sut.placeOrder(req)
+		OrderResult result = sut.placeOrder(req);
+
+		// Then: totalTax = 1000.00 totalGross = 11000 calcTaxAmount(10000.00,any(),RoundingMode.HALF_UP), addTax(10000.00,any(),RoundingMode.HALF_UP)
+		assertThat(result.totalTax()).isEqualByComparingTo("1000.00");
+		assertThat(result.totalGross()).isEqualByComparingTo("11000");
+		ArgumentCaptor<RoundingMode> modeCaptor = ArgumentCaptor.forClass(RoundingMode.class);
+
+		// calcTaxAmount, addTax呼び出しの引数をキャプチャ
+        verify(tax).calcTaxAmount(any(), any(), modeCaptor.capture());
+        verify(tax).addTax(any(), any(), modeCaptor.capture());
+
+        // 確認：HALF_DOWN が渡っていること
+        assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_UP);
+	}
+
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }
@@ -231,6 +293,7 @@ class OrderServiceTest {
 		);
 	}
 	@ParameterizedTest
+	@DisplayName("T-1-1: VOLUME割引適用閾値")
 	@MethodSource("volumeDiscountThresholds")
     void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
@@ -276,6 +339,7 @@ class OrderServiceTest {
 	}
 
 	@ParameterizedTest
+	@DisplayName("T-1-2: MULTI_ITEM割引適用閾値")
 	@MethodSource("multiItemDiscountThresholds")
     void multiItemBoundary_kinds2_3_4(List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		FakeProductRepository fakeRepo = new FakeProductRepository(PRICE);
@@ -308,6 +372,7 @@ class OrderServiceTest {
 	}
 
 	@ParameterizedTest
+	@DisplayName("T-1-3: HIGH_AMOUNT割引適用閾値")
 	@MethodSource("highAmountDiscountThresholds")
     void highAmountBoundary_99999_100000_100001(BigDecimal price, List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
@@ -330,8 +395,109 @@ class OrderServiceTest {
   }
 
   @Nested class VerifyCalls {
-    @Test @Disabled("skeleton")
-    void reservesInOrder_afterDiscounts_onlyOnceEach() {}
+	// 使われたIDだけ返すAnswer（price表）
+	private void stubProductsPriceTable(Map<String, String> table) {
+		when(products.findById(anyString())).thenAnswer(inv -> {String id = inv.getArgument(0, String.class);
+		String p = table.get(id);
+		return p == null ? Optional.empty() : Optional.of(new Product(id, new BigDecimal(p)));
+	    });
+	  }
+    @Test
+    @DisplayName("V-1-1: 正常系の呼び出し順・回数・引数一致")
+    void order_calls_dependencies_in_strict_order_and_passes_region_mode() {
+    	// Given: product = (["A", "100"], ["B", "200"], ["C", "300"])
+        stubProductsPriceTable(Map.of(
+            "A", "100",
+            "B", "200",
+            "C", "300"
+        ));
+        List<Line> lines = List.of(
+            new OrderRequest.Line("A", 1),
+            new OrderRequest.Line("B", 2),
+            new OrderRequest.Line("C", 3)
+        );
+        OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
+
+        // When: sut.placeOrder(req)
+        sut.placeOrder(req);
+
+        // Then: inOrder(products, inventory, tax)
+        InOrder inOrder = inOrder(products, inventory, tax);
+
+        // findById×n（順序はlinesと同じ）
+        inOrder.verify(products).findById("A");
+        inOrder.verify(products).findById("B");
+        inOrder.verify(products).findById("C");
+
+        // reserve×n（同順序・同数量）
+        inOrder.verify(inventory).reserve("A", 1);
+        inOrder.verify(inventory).reserve("B", 2);
+        inOrder.verify(inventory).reserve("C", 3);
+
+        // 税：calc → add の順、同じ引数が渡る
+        ArgumentCaptor<BigDecimal> netCap = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<String> regionCap = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<RoundingMode> modeCap = ArgumentCaptor.forClass(RoundingMode.class);
+
+        inOrder.verify(tax).calcTaxAmount(netCap.capture(), regionCap.capture(), modeCap.capture());
+        inOrder.verify(tax).addTax(eq(netCap.getValue()), eq(regionCap.getValue()), eq(modeCap.getValue()));
+
+        assertThat(regionCap.getValue()).isEqualTo("JP");
+        assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
+
+        // 余計な呼び出しが無いこと
+        inOrder.verifyNoMoreInteractions();
+        verifyNoMoreInteractions(products, inventory, tax);
+    }
+
+    @Test
+    @DisplayName("V-1-2: mode が null のとき HALF_UP が渡る（デフォルト）")
+    void order_passes_HALF_UP_when_mode_is_null() {
+    	// Given: Product = (["A", "1000"])
+        stubProductsPriceTable(Map.of("A", "1000"));
+        OrderRequest req = new OrderRequest("JP", null, List.of(new OrderRequest.Line("A", 1)));
+
+        // When: sut.placeOrder(req)
+        sut.placeOrder(req);
+
+        // Then: modeCap = RoundingMode.HALF_UP
+        ArgumentCaptor<RoundingMode> modeCap = ArgumentCaptor.forClass(RoundingMode.class);
+        verify(tax).calcTaxAmount(any(), anyString(), modeCap.capture());
+        verify(tax).addTax(any(), anyString(), eq(modeCap.getValue()));
+        assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_UP);
+    }
+
+    @Test
+    @DisplayName("V-1-3: 在庫例外で税が呼ばれない（異常の順序保証）")
+    void when_inventory_throws_tax_is_never_called() {
+    	// Given: Product = (["A", 100], ["B", 200])
+        stubProductsPriceTable(Map.of(
+            "A", "100",
+            "B", "200"
+        ));
+
+        // 2本目のreserveで例外
+        doNothing().when(inventory).reserve("A", 1);
+        doThrow(new RuntimeException("inventory down")).when(inventory).reserve("B", 2);
+
+        OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new OrderRequest.Line("A", 1), new OrderRequest.Line("B", 2)));
+        
+        // When: sut.placeOrder(req) / Then: RuntimeException
+        assertThatThrownBy(() -> sut.placeOrder(req))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("inventory");
+
+        // findByIdは2件呼ばれている（順序検証）
+        InOrder inOrder = inOrder(products, inventory, tax);
+        inOrder.verify(products).findById("A");
+        inOrder.verify(products).findById("B");
+        inOrder.verify(inventory).reserve("A", 1);
+        inOrder.verify(inventory).reserve("B", 2);
+
+        // 税計算は呼ばれない
+        verify(tax, never()).calcTaxAmount(any(), anyString(), any());
+        verify(tax, never()).addTax(any(), anyString(), any());
+    }
   }
 
   @Nested class Abnormal {
