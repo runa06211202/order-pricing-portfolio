@@ -292,6 +292,7 @@ class OrderServiceTest {
 		);
 	}
 	@ParameterizedTest
+	@DisplayName("T-1-1: VOLUME割引適用閾値")
 	@MethodSource("volumeDiscountThresholds")
     void volumeBoundary_qty9_10_11(int qty, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
@@ -337,6 +338,7 @@ class OrderServiceTest {
 	}
 
 	@ParameterizedTest
+	@DisplayName("T-1-2: MULTI_ITEM割引適用閾値")
 	@MethodSource("multiItemDiscountThresholds")
     void multiItemBoundary_kinds2_3_4(List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		FakeProductRepository fakeRepo = new FakeProductRepository(PRICE);
@@ -369,6 +371,7 @@ class OrderServiceTest {
 	}
 
 	@ParameterizedTest
+	@DisplayName("T-1-3: HIGH_AMOUNT割引適用閾値")
 	@MethodSource("highAmountDiscountThresholds")
     void highAmountBoundary_99999_100000_100001(BigDecimal price, List<Line> lines, BigDecimal expectedNet, BigDecimal expectedDiscount, BigDecimal expectedAfterDiscount, List<DiscountType> expectedLabels) {
 		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, lines);
@@ -391,7 +394,8 @@ class OrderServiceTest {
   }
 
   @Nested class VerifyCalls {
-    @Test @Disabled("skeleton")
+    @Test
+    
     void reservesInOrder_afterDiscounts_onlyOnceEach() {}
   }
 
