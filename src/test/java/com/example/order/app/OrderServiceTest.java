@@ -256,7 +256,12 @@ class OrderServiceTest {
 	void checkModeNull() {
 		List<Line>lines = List.of(new Line("A", 5), new Line("B", 5));
 		// Given: OrderRequest = any(), null, lines 割引なしになるよう設定
-		OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
+		OrderRequest req = new OrderRequest("JP", null, lines);
+
+		when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("1000"))));
+		when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("1000"))));
+		when(tax.calcTaxAmount(any(), any(), any())).thenReturn(new BigDecimal("1000.00"));
+		when(tax.addTax(any(), any(), any())).thenReturn(new BigDecimal("11000"));
 
 		// When: sut.placeOrder(req)
 		OrderResult result = sut.placeOrder(req);
@@ -273,6 +278,7 @@ class OrderServiceTest {
         // 確認：HALF_DOWN が渡っていること
         assertThat(modeCaptor.getValue()).isEqualTo(RoundingMode.HALF_UP);
 	}
+
     @Test @Disabled("skeleton")
     void endToEnd_happyPath_returnsExpectedTotalsAndLabels() {}
   }

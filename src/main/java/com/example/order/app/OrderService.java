@@ -122,10 +122,11 @@ public class OrderService {
 	  for(Line line : req.lines()) {
 		  inventory.reserve(line.productId(), line.qty());
 	  }
-	  
+
+	  RoundingMode modeOrDefault = (req.mode() == null) ? RoundingMode.HALF_UP : req.mode();
 	  //税計算
-	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetAfterDiscount, req.region(), req.mode()));
-	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), req.mode()));
+	  totalTax = totalTax.add(tax.calcTaxAmount(totalNetAfterDiscount, req.region(), modeOrDefault));
+	  totalGross = totalGross.add(tax.addTax(totalNetAfterDiscount, req.region(), modeOrDefault));
 
 	  
 	  OrderResult orderResult = new OrderResult(orderNetBeforeDiscount.setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP),
