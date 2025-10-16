@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.example.order.domain.model.Product;
 import com.example.order.domain.policy.DiscountCapPolicy;
@@ -84,7 +85,10 @@ public class OrderService {
 	  BigDecimal subtotalMultiItemDiscount = BigDecimal.ZERO;
 
 	  // MULTI_ITEM割引
-	  if(req.lines().size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
+	  List<Line> distinctLines = req.lines().stream()
+			  .distinct()
+			  .collect(Collectors.toList());
+	  if(distinctLines.size() >= MULTI_ITEM_DISCOUNT_NUMBER_OF_LINES) {
 		  multiItemDiscount = subtotalVolumeDiscount.multiply(MULTI_ITEM_DISCOUNT_RATE);
 	  }
 	  if(multiItemDiscount.compareTo(BigDecimal.ZERO) == 1) {
