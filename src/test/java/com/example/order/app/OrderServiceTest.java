@@ -466,6 +466,38 @@ class OrderServiceTest {
         verify(tax).addTax(any(), anyString(), eq(modeCap.getValue()));
         assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_UP);
     }
+
+    @Test
+    @DisplayName("V-1-3: 在庫例外で税が呼ばれない（異常の順序保証）")
+    void when_inventory_throws_tax_is_never_called() {
+    	// Given: Product = (["A", 100], ["B", 200])
+        stubProductsPriceTable(Map.of(
+            "A", "100",
+            "B", "200"
+        ));
+
+        // 2本目のreserveで例外
+        doNothing().when(inventory).reserve("A", 1);
+        doThrow(new RuntimeException("inventory down")).when(inventory).reserve("B", 2);
+
+        OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new OrderRequest.Line("A", 1), new OrderRequest.Line("B", 2)));
+        
+        // When: sut.placeOrder(req) / Then: RuntimeException
+        assertThatThrownBy(() -> sut.placeOrder(req))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("inventory");
+
+        // findByIdは2件呼ばれている（順序検証）
+        InOrder inOrder = inOrder(products, inventory, tax);
+        inOrder.verify(products).findById("A");
+        inOrder.verify(products).findById("B");
+        inOrder.verify(inventory).reserve("A", 1);
+        inOrder.verify(inventory).reserve("B", 2);
+
+        // 税計算は呼ばれない
+        verify(tax, never()).calcTaxAmount(any(), anyString(), any());
+        verify(tax, never()).addTax(any(), anyString(), any());
+    }
   }
 
   @Nested class Abnormal {
