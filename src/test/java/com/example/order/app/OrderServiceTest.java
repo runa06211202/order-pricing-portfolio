@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -394,9 +395,56 @@ class OrderServiceTest {
   }
 
   @Nested class VerifyCalls {
+	// 使われたIDだけ返すAnswer（price表）
+	private void stubProductsPriceTable(Map<String, String> table) {
+		when(products.findById(anyString())).thenAnswer(inv -> {String id = inv.getArgument(0, String.class);
+		String p = table.get(id);
+		return p == null ? Optional.empty() : Optional.of(new Product(id, new BigDecimal(p)));
+	    });
+	  }
     @Test
-    
-    void reservesInOrder_afterDiscounts_onlyOnceEach() {}
+    @DisplayName("V-1-1: 正常系の呼び出し順・回数・引数一致")
+    void order_calls_dependencies_in_strict_order_and_passes_region_mode() {
+    	// Given: product = (["A", "100"], ["B", "200"], ["C", "300"])
+        stubProductsPriceTable(Map.of(
+            "A", "100",
+            "B", "200",
+            "C", "300"
+        ));
+        List<Line> lines = List.of(
+            new OrderRequest.Line("A", 1),
+            new OrderRequest.Line("B", 2),
+            new OrderRequest.Line("C", 3)
+        );
+        OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_DOWN, lines);
+
+        // When: sut.placeOrder(req)
+        sut.placeOrder(req);
+
+        // Then: inOrder(products, inventory, tax)
+        InOrder inOrder = inOrder(products, inventory, tax);
+
+        // findById×n（順序はlinesと同じ）
+        inOrder.verify(products).findById("A");
+        inOrder.verify(products).findById("B");
+        inOrder.verify(products).findById("C");
+
+        // reserve×n（同順序・同数量）
+        inOrder.verify(inventory).reserve("A", 1);
+        inOrder.verify(inventory).reserve("B", 2);
+        inOrder.verify(inventory).reserve("C", 3);
+
+        // 税：calc → add の順、同じ引数が渡る
+        ArgumentCaptor<BigDecimal> netCap = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<String> regionCap = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<RoundingMode> modeCap = ArgumentCaptor.forClass(RoundingMode.class);
+
+        inOrder.verify(tax).calcTaxAmount(netCap.capture(), regionCap.capture(), modeCap.capture());
+        inOrder.verify(tax).addTax(eq(netCap.getValue()), eq(regionCap.getValue()), eq(modeCap.getValue()));
+
+        assertThat(regionCap.getValue()).isEqualTo("JP");
+        assertThat(modeCap.getValue()).isEqualTo(RoundingMode.HALF_DOWN);
+    }
   }
 
   @Nested class Abnormal {
