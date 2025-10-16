@@ -521,8 +521,43 @@ class OrderServiceTest {
   }
 
   @Nested class Abnormal {
-    @Test @Disabled("skeleton")
-    void inventoryThrows_taxNotCalled() {}
+	  @Test
+	  @DisplayName("A-1-1: calcTaxAmountで例外発生(例外伝播)")
+	  void tax_calc_throws_then_propagates_and_addTax_is_never_called() {
+		  // Given: 価格表（使うIDだけ）
+		  when(products.findById("A")).thenReturn(Optional.of(new Product("A", new BigDecimal("100"))));
+		  when(products.findById("B")).thenReturn(Optional.of(new Product("B", new BigDecimal("200"))));
+
+		  // reserveは1本目成功、2本目も成功（在庫で落とさない）
+		  doNothing().when(inventory).reserve("A", 1);
+		  doNothing().when(inventory).reserve("B", 2);
+
+		  // 税：calcTaxAmountで落とす
+		  doThrow(new RuntimeException("tax down")).when(tax).calcTaxAmount(any(), anyString(), any());
+
+		  OrderRequest req = new OrderRequest("JP", RoundingMode.HALF_UP, List.of(new Line("A", 1), new Line("B", 2)));
+
+		  // When/Then: 例外伝播
+		  assertThatThrownBy(() -> sut.placeOrder(req))
+		  	.isInstanceOf(RuntimeException.class)
+		  	.hasMessageContaining("tax down");
+
+		  // 順序検証：find → reserve までは実行済み
+		  InOrder inOrder = inOrder(products, inventory, tax);
+		  inOrder.verify(products).findById("A");
+		  inOrder.verify(products).findById("B");
+		  inOrder.verify(inventory).reserve("A", 1);
+		  inOrder.verify(inventory).reserve("B", 2);
+
+		  // calcTaxAmount が呼ばれた直後に例外で終了
+		  inOrder.verify(tax).calcTaxAmount(any(), eq("JP"), eq(RoundingMode.HALF_UP));
+
+		  // addTax は呼ばれない
+		  verify(tax, never()).addTax(any(), anyString(), any());
+
+		  // 余計な呼び出しなし
+		  verifyNoMoreInteractions(products, inventory, tax);
+	  }
   }
  
   @Nested class FormatAndADR {
