@@ -23,9 +23,6 @@ public class OrderService {
   private final InventoryService inventory;
   private final TaxCalculator tax;
   private final DiscountCapPolicy capPolicy;
-  private static final String LINES = "lines";
-  private static final String QTY = "qty";
-  private static final String REGION = "region";
   private static final BigDecimal VOLUME_DISCOUNT_RATE = new BigDecimal("0.05");
   private static final BigDecimal MULTI_ITEM_DISCOUNT_RATE = new BigDecimal("0.02");
   private static final BigDecimal HIGH_AMOUNT_DISCOUNT_RATE = new BigDecimal("0.03");
